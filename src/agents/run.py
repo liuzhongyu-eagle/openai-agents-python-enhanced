@@ -269,7 +269,7 @@ class Runner:
         hooks: RunHooks[TContext] | None = None,
         run_config: RunConfig | None = None,
         previous_response_id: str | None = None,
-    ) -> RunResultStreaming:
+    ) -> RunResultStreaming[TContext]:
         """Run a workflow starting at the given agent in streaming mode. The returned result object
         contains a method you can use to stream semantic events as they are generated.
         The agent will run in a loop until a final output is generated. The loop runs like so:
@@ -505,7 +505,7 @@ class AgentRunner:
         starting_agent: Agent[TContext],
         input: str | list[TResponseInputItem],
         **kwargs: Unpack[RunOptions[TContext]],
-    ) -> RunResultStreaming:
+    ) -> RunResultStreaming[TContext]:
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
         hooks = kwargs.get("hooks")
@@ -574,7 +574,7 @@ class AgentRunner:
         guardrails: list[InputGuardrail[TContext]],
         input: str | list[TResponseInputItem],
         context: RunContextWrapper[TContext],
-        streamed_result: RunResultStreaming,
+        streamed_result: RunResultStreaming[TContext],
         parent_span: Span[Any],
     ):
         queue = streamed_result._input_guardrail_queue
@@ -614,7 +614,7 @@ class AgentRunner:
     async def _start_streaming(
         cls,
         starting_input: str | list[TResponseInputItem],
-        streamed_result: RunResultStreaming,
+        streamed_result: RunResultStreaming[TContext],
         starting_agent: Agent[TContext],
         max_turns: int,
         hooks: RunHooks[TContext],
@@ -773,7 +773,7 @@ class AgentRunner:
     @classmethod
     async def _run_single_turn_streamed(
         cls,
-        streamed_result: RunResultStreaming,
+        streamed_result: RunResultStreaming[TContext],
         agent: Agent[TContext],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
@@ -866,6 +866,7 @@ class AgentRunner:
             context_wrapper=context_wrapper,
             run_config=run_config,
             tool_use_tracker=tool_use_tracker,
+            streamed_result=streamed_result,
         )
 
         RunImpl.stream_step_result_to_queue(single_step_result, streamed_result._event_queue)
@@ -933,6 +934,7 @@ class AgentRunner:
             context_wrapper=context_wrapper,
             run_config=run_config,
             tool_use_tracker=tool_use_tracker,
+            streamed_result=None,
         )
 
     @classmethod
@@ -950,6 +952,7 @@ class AgentRunner:
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
         tool_use_tracker: AgentToolUseTracker,
+        streamed_result: RunResultStreaming[TContext] | None = None,
     ) -> SingleStepResult:
         processed_response = RunImpl.process_model_response(
             agent=agent,
@@ -961,7 +964,7 @@ class AgentRunner:
 
         tool_use_tracker.add_tool_use(agent, processed_response.tools_used)
 
-        return await RunImpl.execute_tools_and_side_effects(
+        turn_result = await RunImpl.execute_tools_and_side_effects(
             agent=agent,
             original_input=original_input,
             pre_step_items=pre_step_items,
@@ -971,7 +974,10 @@ class AgentRunner:
             hooks=hooks,
             context_wrapper=context_wrapper,
             run_config=run_config,
+            streamed_result=streamed_result,
         )
+
+        return turn_result
 
     @classmethod
     async def _run_input_guardrails(
