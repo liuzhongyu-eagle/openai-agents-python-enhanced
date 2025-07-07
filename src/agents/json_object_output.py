@@ -11,7 +11,6 @@ JSON Object 输出兼容性模块
 
 import json
 import logging
-from dataclasses import dataclass
 from typing import Any, Optional
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -22,36 +21,11 @@ from .exceptions import ModelBehaviorError
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class JsonObjectConfig:
-    """JsonObjectOutputSchema 的全局配置类"""
-
-    default_language: str = "zh"
-    """默认指令语言"""
-
-    default_include_examples: bool = True
-    """默认是否包含示例"""
-
-    default_validation_mode: str = "strict"
-    """默认验证模式：strict 或 lenient"""
-
-    enable_instruction_cache: bool = True
-    """是否启用指令缓存"""
-
-    enable_validator_cache: bool = True
-    """是否启用验证器缓存"""
-
-    enable_smart_fallback: bool = True
-    """是否启用智能降级"""
-
-    @classmethod
-    def set_defaults(cls, **kwargs: Any) -> None:
-        """设置全局默认配置"""
-        for key, value in kwargs.items():
-            if hasattr(cls, key):
-                setattr(cls, key, value)
-            else:
-                raise ValueError(f"未知的配置项: {key}")
+# 简化的配置常量 - 移除不必要的全局配置
+_DEFAULT_LANGUAGE = "zh"
+_DEFAULT_INCLUDE_EXAMPLES = True
+_ENABLE_INSTRUCTION_CACHE = True
+_ENABLE_VALIDATOR_CACHE = True
 
 
 class ModelCapabilityDetector:
@@ -157,7 +131,7 @@ class InstructionGenerator:
             return custom_instructions
 
         # 检查缓存
-        if JsonObjectConfig.enable_instruction_cache:
+        if _ENABLE_INSTRUCTION_CACHE:
             cache_key = (target_type, language, include_examples)
             if cache_key in cls._instruction_cache:
                 return cls._instruction_cache[cache_key]
@@ -169,7 +143,7 @@ class InstructionGenerator:
             )
 
             # 缓存指令
-            if JsonObjectConfig.enable_instruction_cache:
+            if _ENABLE_INSTRUCTION_CACHE:
                 cls._instruction_cache[cache_key] = instruction
 
             return instruction
@@ -380,13 +354,13 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
             auto_generate_instructions: 是否自动生成指令
         """
         self._target_type = target_type
-        self._instruction_language = instruction_language or JsonObjectConfig.default_language
+        self._instruction_language = instruction_language or _DEFAULT_LANGUAGE
         self._include_examples = (
             include_examples if include_examples is not None
-            else JsonObjectConfig.default_include_examples
+            else _DEFAULT_INCLUDE_EXAMPLES
         )
         self._custom_instructions = custom_instructions
-        self._validation_mode = validation_mode or JsonObjectConfig.default_validation_mode
+        self._validation_mode = validation_mode or "strict"
         self._auto_generate_instructions = auto_generate_instructions
 
         # 初始化验证器
@@ -405,7 +379,7 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
 
     def _init_type_adapter(self) -> None:
         """初始化类型适配器"""
-        if JsonObjectConfig.enable_validator_cache:
+        if _ENABLE_VALIDATOR_CACHE:
             if self._target_type not in self._validator_cache:
                 self._validator_cache[self._target_type] = TypeAdapter(self._target_type)
             self._type_adapter = self._validator_cache[self._target_type]

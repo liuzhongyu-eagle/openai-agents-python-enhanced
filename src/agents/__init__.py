@@ -41,7 +41,6 @@ from .items import (
 )
 from .json_object_output import (
     InstructionGenerator,
-    JsonObjectConfig,
     JsonObjectOutputSchema,
     ModelCapabilityDetector,
 )
@@ -185,7 +184,6 @@ __all__ = [
     "AgentOutputSchema",
     "AgentOutputSchemaBase",
     "JsonObjectOutputSchema",
-    "JsonObjectConfig",
     "ModelCapabilityDetector",
     "InstructionGenerator",
     "Computer",

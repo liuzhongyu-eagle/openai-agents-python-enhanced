@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 from agents import Agent, AgentOutputSchema
 from agents.exceptions import ModelBehaviorError
 from agents.json_object_output import (
-    JsonObjectConfig,
     JsonObjectOutputSchema,
     ModelCapabilityDetector,
 )
@@ -363,29 +362,24 @@ class TestEndToEndFunctionality:
         assert isinstance(result, UserProfile)
         assert result.name == "李四"
 
-    def test_configuration_inheritance(self):
-        """测试配置继承"""
-        # 设置全局配置
-        original_language = JsonObjectConfig.default_language
-        original_examples = JsonObjectConfig.default_include_examples
+    def test_instance_configuration(self):
+        """测试实例级配置（替代全局配置）"""
+        # 英文配置
+        en_schema = JsonObjectOutputSchema(
+            UserProfile,
+            instruction_language="en",
+            include_examples=False
+        )
 
-        try:
-            JsonObjectConfig.set_defaults(
-                default_language="en",
-                default_include_examples=False
-            )
+        instructions = en_schema.generated_instructions
+        assert "Please return a JSON object" in instructions
+        assert "Example output:" not in instructions
 
-            # 创建 JsonObjectOutputSchema，应该继承全局配置
-            output_schema = JsonObjectOutputSchema(UserProfile)
-
-            instructions = output_schema.generated_instructions
-            assert "Please return a JSON object" in instructions
-            assert "Example output:" not in instructions
-
-        finally:
-            # 恢复原始配置
-            JsonObjectConfig.default_language = original_language
-            JsonObjectConfig.default_include_examples = original_examples
+        # 中文配置（默认）
+        zh_schema = JsonObjectOutputSchema(UserProfile)
+        zh_instructions = zh_schema.generated_instructions
+        assert "请返回一个严格符合 JSON 格式的对象" in zh_instructions
+        assert "示例输出：" in zh_instructions
 
     def test_error_handling_integration(self):
         """测试错误处理集成"""

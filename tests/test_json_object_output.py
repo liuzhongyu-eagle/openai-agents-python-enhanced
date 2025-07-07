@@ -21,7 +21,6 @@ from typing_extensions import TypedDict
 from agents.exceptions import ModelBehaviorError
 from agents.json_object_output import (
     InstructionGenerator,
-    JsonObjectConfig,
     JsonObjectOutputSchema,
     ModelCapabilityDetector,
 )
@@ -251,8 +250,7 @@ class TestInstructionGenerator:
         # 清空缓存
         InstructionGenerator._instruction_cache.clear()
 
-        # 启用缓存
-        JsonObjectConfig.enable_instruction_cache = True
+        # 缓存默认启用
 
         # 第一次生成
         instructions1 = InstructionGenerator.generate_json_instructions(UserProfile)
@@ -336,35 +334,7 @@ class TestModelCapabilityDetector:
         assert ModelCapabilityDetector.supports_json_schema(mock_model) is False
 
 
-class TestJsonObjectConfig:
-    """配置类测试"""
-
-    def test_default_configuration(self):
-        """测试默认配置"""
-        assert JsonObjectConfig.default_language == "zh"
-        assert JsonObjectConfig.default_include_examples is True
-        assert JsonObjectConfig.default_validation_mode == "strict"
-        assert JsonObjectConfig.enable_instruction_cache is True
-        assert JsonObjectConfig.enable_validator_cache is True
-        assert JsonObjectConfig.enable_smart_fallback is True
-
-    def test_set_defaults(self):
-        """测试设置默认值"""
-        # 保存原始值
-        original_language = JsonObjectConfig.default_language
-
-        try:
-            # 设置新值
-            JsonObjectConfig.set_defaults(default_language="en")
-            assert JsonObjectConfig.default_language == "en"
-
-            # 测试无效配置项
-            with pytest.raises(ValueError):
-                JsonObjectConfig.set_defaults(invalid_config="value")
-
-        finally:
-            # 恢复原始值
-            JsonObjectConfig.default_language = original_language
+# 移除了复杂的全局配置类，使用简单的常量配置
 
 
 class TestCachingMechanism:
@@ -375,8 +345,7 @@ class TestCachingMechanism:
         # 清空缓存
         JsonObjectOutputSchema._validator_cache.clear()
 
-        # 启用缓存
-        JsonObjectConfig.enable_validator_cache = True
+        # 缓存默认启用
 
         # 创建第一个实例
         JsonObjectOutputSchema(UserProfile)

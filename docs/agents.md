@@ -68,6 +68,83 @@ agent = Agent(
 
     When you pass an `output_type`, that tells the model to use [structured outputs](https://platform.openai.com/docs/guides/structured-outputs) instead of regular plain text responses.
 
+### JSON Object Output Compatibility
+
+For LLM providers that only support `{'type': 'json_object'}` format (instead of the more advanced `json_schema`), the SDK provides specialized output schemas with automatic compatibility handling.
+
+#### JsonObjectOutputSchema
+
+Use `JsonObjectOutputSchema` when you specifically need `json_object` mode compatibility:
+
+```python
+from agents import Agent, JsonObjectOutputSchema
+from pydantic import BaseModel, Field
+
+class UserProfile(BaseModel):
+    name: str = Field(description="用户的姓名")
+    age: int = Field(description="用户的年龄", ge=0, le=150)
+    city: str = Field(description="用户居住的城市")
+    is_active: bool = Field(description="用户当前是否活跃")
+
+# Always uses json_object mode with prompt injection
+agent = Agent(
+    name="JsonObjectAgent",
+    instructions="你是一个专业的用户信息处理助手",
+    output_type=JsonObjectOutputSchema(UserProfile)
+)
+```
+
+#### Smart Fallback with AgentOutputSchema
+
+For maximum compatibility, enable smart fallback that automatically detects model capabilities:
+
+```python
+from agents import Agent, AgentOutputSchema
+
+# Prefers json_schema, falls back to json_object when needed
+agent = Agent(
+    name="SmartAgent",
+    instructions="你是一个智能的用户信息处理助手",
+    output_type=AgentOutputSchema(UserProfile, fallback_to_json_object=True)
+)
+```
+
+#### Key Features
+
+- **Automatic Detection**: Detects whether the model supports `json_schema` or only `json_object`
+- **Prompt Injection**: Automatically injects JSON schema instructions into system prompts for `json_object` mode
+- **Multi-language Support**: Generates instructions in Chinese (default) or English
+- **Type Safety**: Maintains strict Pydantic validation regardless of the underlying format
+- **Backwards Compatible**: Existing `AgentOutputSchema` usage continues to work unchanged
+
+#### Configuration Options
+
+```python
+# Customize instruction generation
+schema = JsonObjectOutputSchema(
+    UserProfile,
+    instruction_language="en",           # "zh" (Chinese) or "en" (English)
+    include_examples=True,               # Include JSON examples in instructions
+    custom_instructions="Custom format instructions",  # Override auto-generated instructions
+    validation_mode="strict"             # "strict" or "lenient" validation
+)
+```
+
+#### Factory Methods
+
+```python
+# For different data types
+pydantic_schema = JsonObjectOutputSchema.for_pydantic_model(UserProfile)
+dataclass_schema = JsonObjectOutputSchema.for_dataclass(TaskItem)
+typed_dict_schema = JsonObjectOutputSchema.for_typed_dict(UserDict)
+```
+
+!!! tip "When to Use Each Approach"
+
+    - Use `JsonObjectOutputSchema` when you know you need `json_object` mode compatibility
+    - Use `AgentOutputSchema` with `fallback_to_json_object=True` for maximum compatibility across different LLM providers
+    - Use regular `AgentOutputSchema` (without fallback) when you only work with providers that support `json_schema`
+
 ## Handoffs
 
 Handoffs are sub-agents that the agent can delegate to. You provide a list of handoffs, and the agent can choose to delegate to them if relevant. This is a powerful pattern that allows orchestrating modular, specialized agents that excel at a single task. Read more in the [handoffs](handoffs.md) documentation.
