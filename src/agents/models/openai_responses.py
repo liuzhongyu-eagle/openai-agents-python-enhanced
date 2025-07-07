@@ -376,26 +376,7 @@ class Converter:
         if output_schema is None or output_schema.is_plain_text():
             return NOT_GIVEN
 
-        # 检查是否需要智能降级到 json_object
-        if (hasattr(output_schema, 'fallback_to_json_object') and
-            output_schema.fallback_to_json_object and
-            model is not None):
-
-            # 导入能力检测器（避免循环导入）
-            try:
-                from ..json_object_output import ModelCapabilityDetector
-                if not ModelCapabilityDetector.supports_json_schema(model):
-                    # 降级到 json_object 模式
-                    return {
-                        "format": {
-                            "type": "json_object"
-                        }
-                    }
-            except ImportError:
-                # 如果导入失败，继续使用 json_schema
-                pass
-
-        # 默认使用 json_schema 模式
+        # 使用 json_schema 模式
         return {
             "format": {
                 "type": "json_schema",

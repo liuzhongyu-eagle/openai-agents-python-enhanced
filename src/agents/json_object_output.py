@@ -2,11 +2,7 @@
 JSON Object 输出兼容性模块
 
 该模块提供对仅支持 {'type': 'json_object'} 格式的 LLM 供应商的兼容性支持。
-主要包含：
-1. JsonObjectOutputSchema - 兼容性输出模式类
-2. InstructionGenerator - 智能指令生成器
-3. ModelCapabilityDetector - 模型能力检测器
-4. 相关配置和工具类
+业务层可以根据模型能力选择使用 JsonObjectOutputSchema 或标准的 AgentOutputSchema。
 """
 
 import json
@@ -22,88 +18,23 @@ from .util._json_repair import repair_and_validate_json
 logger = logging.getLogger(__name__)
 
 
-# 简化的配置常量 - 移除不必要的全局配置
-_DEFAULT_LANGUAGE = "zh"
-_DEFAULT_INCLUDE_EXAMPLES = True
-_ENABLE_INSTRUCTION_CACHE = True
-_ENABLE_VALIDATOR_CACHE = True
-_ENABLE_JSON_REPAIR = True  # 默认启用 JSON 修复功能
 
-
-class ModelCapabilityDetector:
-    """检测模型供应商能力的工具类"""
-
-    # 已知支持 json_schema 的模型名称模式
-    KNOWN_JSON_SCHEMA_MODELS = [
-        "gpt-4", "gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo",
-        "claude-3", "claude-3.5",
-        "gemini-pro", "gemini-1.5"
-    ]
-
-    @classmethod
-    def supports_json_schema(cls, model: Any) -> bool:
-        """
-        检测模型是否支持完整的 json_schema 格式
-
-        Args:
-            model: 模型实例或模型名称
-
-        Returns:
-            bool: 是否支持 json_schema
-        """
-        # 1. 检查模型是否有显式的能力声明方法
-        if hasattr(model, 'supports_json_schema'):
-            try:
-                result = model.supports_json_schema()
-                return bool(result)
-            except Exception as e:
-                logger.warning(f"调用模型的 supports_json_schema 方法失败: {e}")
-
-        # 2. 检查模型是否有能力属性
-        if hasattr(model, 'capabilities'):
-            capabilities = getattr(model, 'capabilities', {})
-            if isinstance(capabilities, dict):
-                return bool(capabilities.get('json_schema', False))
-
-        # 3. 基于模型名称的启发式检测
-        model_str = str(model).lower()
-        for known_model in cls.KNOWN_JSON_SCHEMA_MODELS:
-            if known_model.lower() in model_str:
-                logger.debug(f"基于名称检测到支持 json_schema 的模型: {model_str}")
-                return True
-
-        # 4. 检查模型类型（OpenAI 官方模型默认支持）
-        model_type = type(model).__name__.lower()
-        if 'openai' in model_type and 'chatcompletions' in model_type:
-            logger.debug(f"检测到 OpenAI ChatCompletions 模型，默认支持 json_schema: {model_type}")
-            return True
-
-        # 5. 默认假设不支持（保守策略）
-        logger.debug(f"未能确定模型能力，默认假设不支持 json_schema: {model_str}")
-        return False
 
 
 class InstructionGenerator:
     """简化的指令生成器，为 JsonObjectOutputSchema 生成结构化指令"""
 
-    # 指令缓存（简化键）
-    _instruction_cache: dict[tuple[Any, ...], str] = {}
-
     @classmethod
     def generate_json_instructions(
         cls,
         target_type: type[Any],
-        language: str = "zh",
-        include_examples: bool = True,
         custom_instructions: Optional[str] = None
     ) -> str:
         """
-        基于目标类型生成 JSON 输出指令（简化版）
+        基于目标类型生成 JSON 输出指令
 
         Args:
             target_type: 目标 Python 类型
-            language: 指令语言（保留兼容性，但固定使用中文）
-            include_examples: 是否包含示例（保留兼容性，但固定包含）
             custom_instructions: 自定义指令（如果提供，将覆盖自动生成的指令）
 
         Returns:
@@ -113,22 +44,9 @@ class InstructionGenerator:
         if custom_instructions:
             return custom_instructions
 
-        # 简化：固定使用中文和包含示例，检查缓存
-        if _ENABLE_INSTRUCTION_CACHE:
-            cache_key = (target_type,)  # 简化缓存键
-            if cache_key in cls._instruction_cache:
-                return cls._instruction_cache[cache_key]
-
         try:
-            # 生成简化指令（固定中文+示例）
-            instruction = cls._generate_simple_instruction(target_type)
-
-            # 缓存指令
-            if _ENABLE_INSTRUCTION_CACHE:
-                cls._instruction_cache[cache_key] = instruction
-
-            return instruction
-
+            # 生成简化指令
+            return cls._generate_simple_instruction(target_type)
         except Exception as e:
             logger.error(f"生成指令失败: {e}")
             # 返回基础指令作为降级方案
@@ -180,9 +98,9 @@ class InstructionGenerator:
         except Exception as e:
             logger.error(f"生成简化指令失败: {e}")
             return (
-            "请返回一个严格符合 JSON 格式的对象。"
-            "确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。"
-        )
+                "请返回一个严格符合 JSON 格式的对象。"
+                "确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。"
+            )
 
 
 
@@ -311,15 +229,12 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
     同时在本地进行严格的类型验证。
     """
 
-    # 验证器缓存
-    _validator_cache: dict[type[Any], TypeAdapter[Any]] = {}
-
     def __init__(
         self,
         target_type: type[Any],
         *,
         custom_instructions: Optional[str] = None,
-        enable_json_repair: bool = _ENABLE_JSON_REPAIR
+        enable_json_repair: bool = True
     ):
         """
         初始化 JsonObjectOutputSchema
@@ -334,27 +249,15 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         self._enable_json_repair = enable_json_repair
 
         # 初始化验证器
-        self._init_type_adapter()
+        self._type_adapter = TypeAdapter(target_type)
 
-        # 生成指令（简化版，固定使用中文和包含示例）
-        if custom_instructions:
-            self._generated_instructions = custom_instructions
-        else:
-            self._generated_instructions = InstructionGenerator.generate_json_instructions(
-                target_type=target_type,
-                language="zh",  # 固定使用中文
-                include_examples=True,  # 固定包含示例
-                custom_instructions=None
-            )
+        # 生成指令
+        self._generated_instructions = InstructionGenerator.generate_json_instructions(
+            target_type=target_type,
+            custom_instructions=custom_instructions
+        )
 
-    def _init_type_adapter(self) -> None:
-        """初始化类型适配器"""
-        if _ENABLE_VALIDATOR_CACHE:
-            if self._target_type not in self._validator_cache:
-                self._validator_cache[self._target_type] = TypeAdapter(self._target_type)
-            self._type_adapter = self._validator_cache[self._target_type]
-        else:
-            self._type_adapter = TypeAdapter(self._target_type)
+
 
     def is_plain_text(self) -> bool:
         """返回 False，表示输出是 JSON 对象而非纯文本"""
@@ -481,11 +384,4 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         """为 TypedDict 创建 JsonObjectOutputSchema"""
         return cls(target_type=typed_dict_type, **kwargs)
 
-    @classmethod
-    def cleanup_cache(cls, max_size: int = 100) -> None:
-        """清理缓存（如果需要）"""
-        if len(cls._validator_cache) > max_size:
-            # 简单的 LRU 策略：清理一半
-            items = list(cls._validator_cache.items())
-            cls._validator_cache = dict(items[len(items)//2:])
-            logger.info(f"清理验证器缓存，保留 {len(cls._validator_cache)} 项")
+

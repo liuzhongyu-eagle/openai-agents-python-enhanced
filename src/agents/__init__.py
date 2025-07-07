@@ -39,11 +39,7 @@ from .items import (
     ToolCallOutputItem,
     TResponseInputItem,
 )
-from .json_object_output import (
-    InstructionGenerator,
-    JsonObjectOutputSchema,
-    ModelCapabilityDetector,
-)
+from .json_object_output import JsonObjectOutputSchema
 from .lifecycle import AgentHooks, RunHooks
 from .model_settings import ModelSettings
 from .models.interface import Model, ModelProvider, ModelTracing
@@ -184,8 +180,6 @@ __all__ = [
     "AgentOutputSchema",
     "AgentOutputSchemaBase",
     "JsonObjectOutputSchema",
-    "ModelCapabilityDetector",
-    "InstructionGenerator",
     "Computer",
     "AsyncComputer",
     "Environment",

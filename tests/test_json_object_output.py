@@ -22,7 +22,6 @@ from agents.exceptions import ModelBehaviorError
 from agents.json_object_output import (
     InstructionGenerator,
     JsonObjectOutputSchema,
-    ModelCapabilityDetector,
 )
 
 
@@ -179,13 +178,9 @@ class TestJsonObjectOutputSchema:
 class TestInstructionGenerator:
     """指令生成器测试"""
 
-    def test_generate_instructions_chinese(self):
-        """测试中文指令生成"""
-        instructions = InstructionGenerator.generate_json_instructions(
-            UserProfile,
-            language="zh",
-            include_examples=True
-        )
+    def test_generate_instructions_basic(self):
+        """测试基本指令生成"""
+        instructions = InstructionGenerator.generate_json_instructions(UserProfile)
 
         assert "请返回一个严格符合 JSON 格式的对象" in instructions
         assert "name (字符串): 用户的姓名" in instructions
@@ -201,18 +196,7 @@ class TestInstructionGenerator:
         assert "name (字符串): 用户的姓名" in instructions
         assert "示例输出：" in instructions
 
-    def test_generate_instructions_legacy_params(self):
-        """测试传统参数的兼容性（但实际被忽略）"""
-        # 传统参数会被忽略，但不会报错
-        instructions = InstructionGenerator.generate_json_instructions(
-            UserProfile,
-            language="en",  # 被忽略，仍使用中文
-            include_examples=False  # 被忽略，仍包含示例
-        )
 
-        # 实际仍然是中文+示例
-        assert "请返回一个严格符合 JSON 格式的对象" in instructions
-        assert "示例输出：" in instructions
 
     def test_custom_instructions_override(self):
         """测试自定义指令覆盖"""
@@ -225,141 +209,12 @@ class TestInstructionGenerator:
 
         assert instructions == custom_instructions
 
-    def test_instruction_caching(self):
-        """测试指令缓存"""
-        # 清空缓存
-        InstructionGenerator._instruction_cache.clear()
-
-        # 缓存默认启用
-
-        # 第一次生成
-        instructions1 = InstructionGenerator.generate_json_instructions(UserProfile)
-
-        # 检查缓存
-        assert len(InstructionGenerator._instruction_cache) == 1
-
-        # 第二次生成（应该从缓存获取）
-        instructions2 = InstructionGenerator.generate_json_instructions(UserProfile)
-
-        assert instructions1 == instructions2
-        assert len(InstructionGenerator._instruction_cache) == 1
 
 
-class TestModelCapabilityDetector:
-    """模型能力检测器测试"""
-
-    def test_explicit_capability_method(self):
-        """测试显式能力声明方法"""
-        # 模拟支持 json_schema 的模型
-        mock_model = Mock()
-        mock_model.supports_json_schema.return_value = True
-
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is True
-
-        # 模拟不支持 json_schema 的模型
-        mock_model.supports_json_schema.return_value = False
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is False
-
-    def test_capability_attributes(self):
-        """测试能力属性检测"""
-        # 模拟有能力属性的模型
-        mock_model = Mock()
-        mock_model.capabilities = {"json_schema": True}
-        # 确保没有 supports_json_schema 方法，这样会走到能力属性检测
-        del mock_model.supports_json_schema
-
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is True
-
-        # 模拟不支持的模型
-        mock_model.capabilities = {"json_schema": False}
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is False
-
-    def test_name_based_detection(self):
-        """测试基于名称的检测"""
-        # 模拟 OpenAI 模型
-        class MockOpenAIModel:
-            def __str__(self):
-                return "gpt-4-turbo"
-
-        mock_model = MockOpenAIModel()
-
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is True
-
-        # 模拟未知模型
-        class MockUnknownModel:
-            def __str__(self):
-                return "unknown-model"
-
-        mock_unknown_model = MockUnknownModel()
-        assert ModelCapabilityDetector.supports_json_schema(mock_unknown_model) is False
-
-    def test_type_based_detection(self):
-        """测试基于类型的检测"""
-        # 模拟 OpenAI ChatCompletions 模型
-        class MockOpenAIChatCompletionsModel:
-            pass
-
-        mock_model = MockOpenAIChatCompletionsModel()
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is True
-
-    def test_fallback_to_false(self):
-        """测试默认降级到 False"""
-        # 模拟完全未知的模型
-        class MockUnknownModel:
-            def __str__(self):
-                return "completely-unknown-model"
-
-        mock_model = MockUnknownModel()
-
-        assert ModelCapabilityDetector.supports_json_schema(mock_model) is False
 
 
-# 移除了复杂的全局配置类，使用简单的常量配置
 
 
-class TestCachingMechanism:
-    """缓存机制测试"""
-
-    def test_validator_caching(self):
-        """测试验证器缓存"""
-        # 清空缓存
-        JsonObjectOutputSchema._validator_cache.clear()
-
-        # 缓存默认启用
-
-        # 创建第一个实例
-        JsonObjectOutputSchema(UserProfile)
-        assert len(JsonObjectOutputSchema._validator_cache) == 1
-
-        # 创建第二个实例（相同类型）
-        JsonObjectOutputSchema(UserProfile)
-        assert len(JsonObjectOutputSchema._validator_cache) == 1  # 缓存复用
-
-        # 创建不同类型的实例
-        JsonObjectOutputSchema(TaskItem)
-        assert len(JsonObjectOutputSchema._validator_cache) == 2
-
-    def test_cache_cleanup(self):
-        """测试缓存清理"""
-        # 填充缓存
-        JsonObjectOutputSchema._validator_cache.clear()
-
-        # 使用已知的有效类型来填充缓存
-        test_types = [UserProfile, TaskItem, ProductInfo]
-        for i in range(10):
-            # 循环使用已知类型
-            test_type = test_types[i % len(test_types)]
-            # 为了创建不同的缓存项，我们创建一个包装类
-            wrapper_type = type(f"Wrapper{i}", (object,), {"inner_type": test_type})
-            try:
-                JsonObjectOutputSchema(wrapper_type)
-            except Exception:
-                # 如果类型不支持，跳过
-                continue
-
-        # 清理缓存
-        JsonObjectOutputSchema.cleanup_cache(max_size=5)
-        assert len(JsonObjectOutputSchema._validator_cache) <= 5
 
 
 class TestErrorHandling:
@@ -389,12 +244,4 @@ class TestErrorHandling:
         with pytest.raises(ModelBehaviorError):
             schema.validate_json(invalid_json)
 
-    def test_capability_detection_error_handling(self):
-        """测试能力检测错误处理"""
-        # 模拟会抛出异常的模型
-        mock_model = Mock()
-        mock_model.supports_json_schema.side_effect = Exception("测试异常")
 
-        # 应该降级到基于名称的检测，而不抛出异常
-        result = ModelCapabilityDetector.supports_json_schema(mock_model)
-        assert isinstance(result, bool)

@@ -70,14 +70,14 @@ agent = Agent(
 
 ### JSON Object Output Compatibility
 
-For LLM providers that only support `{'type': 'json_object'}` format (instead of the more advanced `json_schema`), the SDK provides specialized output schemas with automatic compatibility handling.
+For LLM providers that only support `{'type': 'json_object'}` format (instead of the more advanced `json_schema`), the SDK provides `JsonObjectOutputSchema` for explicit compatibility handling.
 
-#### JsonObjectOutputSchema
+#### Business Layer Routing
 
-Use `JsonObjectOutputSchema` when you specifically need `json_object` mode compatibility:
+The recommended approach is to let the business layer choose the appropriate schema based on model capabilities:
 
 ```python
-from agents import Agent, JsonObjectOutputSchema
+from agents import Agent, AgentOutputSchema, JsonObjectOutputSchema
 from pydantic import BaseModel, Field
 
 class UserProfile(BaseModel):
@@ -86,7 +86,31 @@ class UserProfile(BaseModel):
     city: str = Field(description="用户居住的城市")
     is_active: bool = Field(description="用户当前是否活跃")
 
-# Always uses json_object mode with prompt injection
+def create_agent(model):
+    """Business layer controls schema selection based on model capabilities"""
+    if model_supports_json_schema(model):
+        # Use standard json_schema for advanced models
+        output_type = AgentOutputSchema(UserProfile, strict_json_schema=True)
+    else:
+        # Use json_object mode for limited models
+        output_type = JsonObjectOutputSchema(UserProfile)
+
+    return Agent(
+        name="UserProfileAgent",
+        instructions="你是一个专业的用户信息处理助手",
+        output_type=output_type,
+        model=model
+    )
+```
+
+#### JsonObjectOutputSchema
+
+Use `JsonObjectOutputSchema` when you know the model only supports `json_object` mode:
+
+```python
+from agents import Agent, JsonObjectOutputSchema
+
+# Explicitly uses json_object mode with automatic prompt injection
 agent = Agent(
     name="JsonObjectAgent",
     instructions="你是一个专业的用户信息处理助手",
@@ -94,28 +118,13 @@ agent = Agent(
 )
 ```
 
-#### Smart Fallback with AgentOutputSchema
-
-For maximum compatibility, enable smart fallback that automatically detects model capabilities:
-
-```python
-from agents import Agent, AgentOutputSchema
-
-# Prefers json_schema, falls back to json_object when needed
-agent = Agent(
-    name="SmartAgent",
-    instructions="你是一个智能的用户信息处理助手",
-    output_type=AgentOutputSchema(UserProfile, fallback_to_json_object=True)
-)
-```
-
 #### Key Features
 
-- **Automatic Detection**: Detects whether the model supports `json_schema` or only `json_object`
-- **Prompt Injection**: Automatically injects JSON schema instructions into system prompts for `json_object` mode
-- **Multi-language Support**: Generates instructions in Chinese (default) or English
-- **Type Safety**: Maintains strict Pydantic validation regardless of the underlying format
-- **Backwards Compatible**: Existing `AgentOutputSchema` usage continues to work unchanged
+- **Explicit Control**: Business layer explicitly chooses the appropriate schema
+- **Automatic Prompt Injection**: Injects JSON schema instructions into system prompts for `json_object` mode
+- **Chinese Instructions**: Generates clear Chinese instructions with examples
+- **Type Safety**: Maintains strict Pydantic validation with JSON repair capabilities
+- **Simplified Design**: No complex auto-detection, just clear business logic
 
 #### Custom Instructions
 
@@ -178,9 +187,9 @@ typed_dict_schema = JsonObjectOutputSchema.for_typed_dict(UserDict)
 
 !!! tip "When to Use Each Approach"
 
-    - Use `JsonObjectOutputSchema` when you know you need `json_object` mode compatibility
-    - Use `AgentOutputSchema` with `fallback_to_json_object=True` for maximum compatibility across different LLM providers
-    - Use regular `AgentOutputSchema` (without fallback) when you only work with providers that support `json_schema`
+    - Use `JsonObjectOutputSchema` when you know the model only supports `json_object` mode
+    - Use `AgentOutputSchema` when you know the model supports `json_schema` mode
+    - Let your business layer choose the appropriate schema based on model capabilities for maximum flexibility
 
 ## Handoffs
 

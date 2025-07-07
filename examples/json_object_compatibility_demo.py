@@ -2,15 +2,14 @@
 """
 OpenAI Agents SDK - JSON Object 输出兼容性演示
 
-本演示展示了新的 JsonObjectOutputSchema 和智能降级功能，
+本演示展示了 JsonObjectOutputSchema 的使用，
 支持仅接受 {'type': 'json_object'} 格式的 LLM 供应商。
 
 功能特性：
 1. JsonObjectOutputSchema - 专为 json_object 模式设计的输出模式
-2. 智能降级机制 - 自动检测模型能力并降级到 json_object
-3. 智能指令生成 - 自动生成结构化的 JSON 输出指令
-4. 提示词注入 - 将 schema 指令注入到系统提示词中
-5. 统一验证机制 - 使用 Pydantic 进行严格类型检查
+2. 自动指令生成 - 自动生成结构化的 JSON 输出指令
+3. 提示词注入 - 将 schema 指令注入到系统提示词中
+4. 统一验证机制 - 使用 Pydantic 进行严格类型检查
 """
 
 import json
@@ -19,13 +18,11 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-# 导入新的 JSON Object 兼容性功能
+# 导入 JSON Object 兼容性功能
 from agents import (
     Agent,
     AgentOutputSchema,
-    InstructionGenerator,
     JsonObjectOutputSchema,
-    ModelCapabilityDetector,
 )
 
 
@@ -86,101 +83,139 @@ def demo_json_object_output_schema():
         print(f"验证失败: {e}")
 
 
-def demo_instruction_generator():
-    """演示简化的指令生成器"""
+def demo_basic_usage():
+    """演示基本使用方法"""
     print("\n" + "=" * 60)
-    print("2. 简化指令生成器演示")
+    print("2. 基本使用演示")
     print("=" * 60)
 
-    # 默认指令生成（固定中文+示例）
-    print("默认指令生成:")
-    print("-" * 40)
-    default_instructions = InstructionGenerator.generate_json_instructions(UserProfile)
-    print(default_instructions)
+    # 创建 JsonObjectOutputSchema
+    schema = JsonObjectOutputSchema(UserProfile)
 
-    # 自定义指令
-    print("\n自定义指令:")
+    print("JsonObjectOutputSchema 配置:")
+    print(f"- 模式名称: {schema.name()}")
+    print(f"- 是否纯文本: {schema.is_plain_text()}")
+    print(f"- JSON Schema: {schema.json_schema()}")
+    print(f"- 需要注入提示词: {schema.should_inject_to_system_prompt()}")
+
+    print("\n生成的指令:")
     print("-" * 40)
-    custom_instructions = "请返回用户信息的 JSON 对象，包含所有必需字段"
-    custom_result = InstructionGenerator.generate_json_instructions(
+    print(schema.get_system_prompt_injection())
+
+
+def demo_validation():
+    """演示验证功能"""
+    print("\n" + "=" * 60)
+    print("3. 验证功能演示")
+    print("=" * 60)
+
+    schema = JsonObjectOutputSchema(UserProfile)
+
+    # 测试有效的 JSON
+    valid_json = '''
+    {
+        "name": "张三",
+        "age": 25,
+        "city": "北京",
+        "is_active": true,
+        "interests": ["编程", "阅读", "旅行"]
+    }
+    '''
+
+    print("验证有效 JSON:")
+    print("-" * 40)
+    try:
+        result = schema.validate_json(valid_json)
+        print(f"验证成功: {result.name}, {result.age}岁, 来自{result.city}")
+        print(f"兴趣: {', '.join(result.interests)}")
+    except Exception as e:
+        print(f"验证失败: {e}")
+
+    # 测试需要修复的 JSON（缺少引号）
+    malformed_json = '''
+    {
+        name: "李四",
+        age: 30,
+        city: "上海",
+        is_active: true,
+        interests: ["音乐", "运动"]
+    }
+    '''
+
+    print("\n验证需要修复的 JSON:")
+    print("-" * 40)
+    try:
+        result = schema.validate_json(malformed_json)
+        print(f"修复并验证成功: {result.name}, {result.age}岁, 来自{result.city}")
+    except Exception as e:
+        print(f"修复失败: {e}")
+
+
+def demo_dataclass_support():
+    """演示 dataclass 支持"""
+    print("\n" + "=" * 60)
+    print("4. Dataclass 支持演示")
+    print("=" * 60)
+
+    schema = JsonObjectOutputSchema.for_dataclass(TaskItem)
+
+    print("Dataclass 输出模式:")
+    print(f"- 模式名称: {schema.name()}")
+    print(f"- 目标类型: {schema.target_type.__name__}")
+
+    # 测试验证
+    test_json = '''
+    {
+        "title": "完成项目文档",
+        "description": "编写项目的技术文档和用户手册",
+        "priority": 1,
+        "completed": false
+    }
+    '''
+
+    print("\n验证 dataclass JSON:")
+    print("-" * 40)
+    try:
+        result = schema.validate_json(test_json)
+        print(f"验证成功: {result.title} (优先级: {result.priority})")
+        print(f"描述: {result.description}")
+        print(f"状态: {'已完成' if result.completed else '未完成'}")
+    except Exception as e:
+        print(f"验证失败: {e}")
+
+
+def demo_custom_instructions():
+    """演示自定义指令"""
+    print("\n" + "=" * 60)
+    print("5. 自定义指令演示")
+    print("=" * 60)
+
+    custom_instructions = """
+请返回一个包含用户信息的 JSON 对象。
+必须包含以下字段：
+- name: 用户姓名（字符串）
+- age: 用户年龄（数字，0-150）
+- city: 居住城市（字符串）
+- is_active: 是否活跃（布尔值）
+- interests: 兴趣爱好（字符串数组）
+
+示例：{"name": "示例用户", "age": 25, "city": "北京", "is_active": true, "interests": ["阅读"]}
+"""
+
+    schema = JsonObjectOutputSchema(
         UserProfile,
         custom_instructions=custom_instructions
     )
-    print(custom_result)
 
-
-def demo_model_capability_detection():
-    """演示模型能力检测"""
-    print("\n" + "=" * 60)
-    print("3. 模型能力检测演示")
-    print("=" * 60)
-
-    # 模拟不同类型的模型
-    test_models = [
-        ("OpenAI GPT-4", "gpt-4-turbo"),
-        ("Claude 3", "claude-3-sonnet"),
-        ("未知模型", "unknown-model"),
-        ("自定义模型", "custom-llm-v1")
-    ]
-
-    for model_name, model_str in test_models:
-        # 创建模拟模型对象
-        class MockModel:
-            def __init__(self, model_string: str):
-                self.model_string = model_string
-
-            def __str__(self):
-                return self.model_string
-
-        mock_model = MockModel(model_str)
-        supports_json_schema = ModelCapabilityDetector.supports_json_schema(mock_model)
-
-        print(f"{model_name} ({model_str}): "
-              f"{'支持' if supports_json_schema else '不支持'} json_schema")
-
-
-def demo_smart_fallback():
-    """演示智能降级机制"""
-    print("\n" + "=" * 60)
-    print("4. 智能降级机制演示")
-    print("=" * 60)
-
-    # 创建启用智能降级的输出模式
-    fallback_schema = AgentOutputSchema(
-        UserProfile,
-        fallback_to_json_object=True
-    )
-
-    print("智能降级配置:")
-    print(f"- 启用降级: {fallback_schema.fallback_to_json_object}")
-    print(f"- 目标类型: {fallback_schema.output_type.__name__}")
-
-    # 模拟不同模型的降级行为
-    class MockUnsupportedModel:
-        def __str__(self):
-            return "unsupported-model"
-
-    class MockSupportedModel:
-        def __str__(self):
-            return "gpt-4-turbo"
-
-    unsupported_model = MockUnsupportedModel()
-    supported_model = MockSupportedModel()
-
-    print(f"\n不支持的模型 ({unsupported_model}):")
-    print(f"- 需要注入: {fallback_schema.should_inject_to_system_prompt(unsupported_model)}")
-    if fallback_schema.should_inject_to_system_prompt(unsupported_model):
-        print("- 注入的指令:")
-        print("  " + fallback_schema.get_system_prompt_injection().replace("\n", "\n  "))
-
-    print(f"\n支持的模型 ({supported_model}):")
-    print(f"- 需要注入: {fallback_schema.should_inject_to_system_prompt(supported_model)}")
+    print("自定义指令:")
+    print("-" * 40)
+    print(schema.get_system_prompt_injection())
 
 
 def demo_agent_integration():
     """演示与 Agent 系统的集成"""
     print("\n" + "=" * 60)
-    print("5. Agent 系统集成演示")
+    print("6. Agent 系统集成演示")
     print("=" * 60)
 
     # 使用 JsonObjectOutputSchema 的 Agent
@@ -198,41 +233,20 @@ def demo_agent_integration():
     if json_object_agent.output_type and hasattr(json_object_agent.output_type, 'should_inject_to_system_prompt'):
         print(f"- 需要注入: {json_object_agent.output_type.should_inject_to_system_prompt()}")
 
-    # 使用智能降级的 Agent
-    smart_agent = Agent(
-        name="SmartAgent",
-        instructions="你是一个智能的用户信息处理助手",
-        output_type=AgentOutputSchema(UserProfile, fallback_to_json_object=True)
+    # 使用标准 AgentOutputSchema 的 Agent（业务层控制）
+    standard_agent = Agent(
+        name="StandardAgent",
+        instructions="你是一个标准的用户信息处理助手",
+        output_type=AgentOutputSchema(UserProfile)
     )
 
-    print("\n智能降级 Agent:")
-    print(f"- Agent 名称: {smart_agent.name}")
-    print(f"- 输出类型: {type(smart_agent.output_type).__name__}")
-    if smart_agent.output_type and hasattr(smart_agent.output_type, 'fallback_to_json_object'):
-        print(f"- 启用降级: {smart_agent.output_type.fallback_to_json_object}")
+    print("\n标准 AgentOutputSchema Agent:")
+    print(f"- Agent 名称: {standard_agent.name}")
+    print(f"- 输出类型: {type(standard_agent.output_type).__name__}")
+    print("- 说明: 业务层根据模型能力选择合适的 Schema")
 
 
-def demo_custom_instructions():
-    """演示自定义指令功能"""
-    print("\n" + "=" * 60)
-    print("6. 自定义指令演示")
-    print("=" * 60)
 
-    print("简化设计：移除复杂的配置参数，专注于核心功能")
-    print("- 固定使用中文指令")
-    print("- 固定包含示例")
-    print("- 支持自定义指令覆盖")
-
-    print("\n默认自动生成的指令:")
-    default_schema = JsonObjectOutputSchema(TaskItem)
-    print(default_schema.get_system_prompt_injection()[:150] + "...")
-
-    print("\n自定义指令:")
-    custom_schema = JsonObjectOutputSchema(
-        TaskItem,
-        custom_instructions="请返回任务项目的 JSON 对象，包含标题、描述、优先级和完成状态。"
-    )
-    print(custom_schema.get_system_prompt_injection())
 
 
 def demo_factory_methods():
@@ -266,24 +280,21 @@ def main():
 
     try:
         demo_json_object_output_schema()
-        demo_instruction_generator()
-        demo_model_capability_detection()
-        demo_smart_fallback()
-        demo_agent_integration()
+        demo_basic_usage()
+        demo_validation()
+        demo_dataclass_support()
         demo_custom_instructions()
-        demo_factory_methods()
+        demo_agent_integration()
 
         print("\n" + "=" * 60)
         print("演示完成！")
         print("=" * 60)
         print("\n主要功能总结:")
         print("✅ JsonObjectOutputSchema - 兼容 json_object 模式")
-        print("✅ 智能指令生成 - 自动生成结构化指令")
-        print("✅ 模型能力检测 - 自动检测模型支持")
-        print("✅ 智能降级机制 - 自动降级到 json_object")
+        print("✅ 自动指令生成 - 自动生成结构化指令")
         print("✅ 提示词注入 - 自动注入 schema 指令")
         print("✅ 统一验证机制 - 严格类型检查")
-        print("✅ 简化设计 - 移除复杂配置，专注核心功能")
+        print("✅ 简化设计 - 业务层控制路由，移除复杂的自动降级逻辑")
         print("✅ 工厂方法 - 便捷的创建方式")
 
     except Exception as e:

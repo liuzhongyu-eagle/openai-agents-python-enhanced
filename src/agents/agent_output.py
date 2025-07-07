@@ -81,7 +81,6 @@ class AgentOutputSchema(AgentOutputSchemaBase):
         self,
         output_type: type[Any],
         strict_json_schema: bool = True,
-        fallback_to_json_object: bool = False,
         enable_json_repair: bool = True
     ):
         """
@@ -89,13 +88,10 @@ class AgentOutputSchema(AgentOutputSchemaBase):
             output_type: The type of the output.
             strict_json_schema: Whether the JSON schema is in strict mode. We **strongly** recommend
                 setting this to True, as it increases the likelihood of correct JSON input.
-            fallback_to_json_object: Whether to automatically fallback to json_object mode when
-                the model doesn't support json_schema. This enables smart fallback compatibility.
             enable_json_repair: Whether to enable JSON repair functionality for malformed JSON.
         """
         self.output_type = output_type
         self._strict_json_schema = strict_json_schema
-        self.fallback_to_json_object = fallback_to_json_object
         self._enable_json_repair = enable_json_repair
 
         if output_type is None or output_type is str:
@@ -139,53 +135,7 @@ class AgentOutputSchema(AgentOutputSchemaBase):
         """Whether the JSON schema is in strict mode."""
         return self._strict_json_schema
 
-    def get_system_prompt_injection(self) -> str:
-        """
-        获取需要注入到系统提示词中的指令
 
-        当启用智能降级且模型不支持 json_schema 时，
-        需要将 schema 定义注入到系统提示词中。
-
-        Returns:
-            str: 需要注入到系统提示词中的指令文本
-        """
-        if not self.fallback_to_json_object:
-            return ""
-
-        # 导入指令生成器（避免循环导入）
-        try:
-            from .json_object_output import InstructionGenerator
-            return InstructionGenerator.generate_json_instructions(
-                target_type=self.output_type,
-                language="zh",  # 默认使用中文
-                include_examples=True
-            )
-        except ImportError:
-            return ""
-
-    def should_inject_to_system_prompt(self, model=None) -> bool:
-        """
-        判断是否需要将指令注入到系统提示词中
-
-        Args:
-            model: 模型实例，用于检测能力
-
-        Returns:
-            bool: 是否需要注入到系统提示词
-        """
-        if not self.fallback_to_json_object:
-            return False
-
-        if model is None:
-            return False
-
-        # 导入能力检测器（避免循环导入）
-        try:
-            from .json_object_output import ModelCapabilityDetector
-            # 如果模型不支持 json_schema，则需要注入
-            return not ModelCapabilityDetector.supports_json_schema(model)
-        except ImportError:
-            return False
 
     def json_schema(self) -> dict[str, Any]:
         """The JSON schema of the output type."""
