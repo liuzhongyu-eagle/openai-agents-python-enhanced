@@ -35,127 +35,31 @@ class InstructionGenerator:
 
         Args:
             target_type: 目标 Python 类型
-            custom_instructions: 自定义指令（如果提供，将覆盖自动生成的指令）
+            custom_instructions: 自定义指令（如果提供，将附加到 schema 后面）
 
         Returns:
             str: 生成的指令字符串
         """
-        # 如果提供了自定义指令，直接返回
-        if custom_instructions:
-            return custom_instructions
-
+        # 获取 JSON Schema
         try:
-            # 生成简化指令
-            return cls._generate_simple_instruction(target_type)
-        except Exception as e:
-            logger.error(f"生成指令失败: {e}")
-            # 返回基础指令作为降级方案
-            return (
-                "请返回一个严格符合 JSON 格式的对象。"
-                "确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。"
-            )
-
-    @classmethod
-    def _generate_simple_instruction(cls, target_type: type[Any]) -> str:
-        """生成简化的指令（基于用户定义的 schema）"""
-        try:
-            # 提取类型信息
-            type_info = cls._extract_type_info(target_type)
-
-            # 构建简化指令
-            instruction_parts = ["Return a JSON object with the following fields:"]
-
-            # 添加字段描述
-            for field_name, field_info in type_info.get("fields", {}).items():
-                field_line = (
-                    f"- {field_name} ({field_info.get('type', 'unknown')}): "
-                    f"{field_info.get('description', 'No description')}"
-                )
-                instruction_parts.append(field_line)
-
-            # 添加必需字段说明
-            if type_info.get("has_required_fields", True):
-                instruction_parts.append("All fields are required.")
-
-            # 添加格式说明
-            instruction_parts.append("")
-            instruction_parts.append("Output only valid JSON with no additional text or explanations.")
-
-            return "\n".join(instruction_parts)
-
-        except Exception as e:
-            logger.error(f"生成简化指令失败: {e}")
-            return (
-                "Return a valid JSON object. "
-                "Output only valid JSON with no additional text or explanations."
-            )
-
-
-
-    @classmethod
-    def _extract_type_info(cls, target_type: type[Any]) -> dict[str, Any]:
-        """提取类型信息，包括字段、类型、描述等"""
-        type_info: dict[str, Any] = {
-            "fields": {},
-            "has_required_fields": True
-        }
-
-        try:
-            # 使用 TypeAdapter 获取 JSON Schema
             adapter = TypeAdapter(target_type)
             schema = adapter.json_schema()
-
-            # 解析 schema 中的字段信息
-            if "properties" in schema:
-                properties = schema["properties"]
-                if isinstance(properties, dict):
-                    for field_name, field_schema in properties.items():
-                        if isinstance(field_schema, dict):
-                            field_info = {
-                                "type": cls._schema_type_to_readable(
-                                    field_schema.get("type", "unknown")
-                                ),
-                                "description": field_schema.get("description", "无描述")
-                            }
-                            type_info["fields"][field_name] = field_info
-
-            # 检查是否有必需字段
-            required_fields = schema.get("required", [])
-            type_info["has_required_fields"] = len(required_fields) > 0
-
+            schema_text = json.dumps(schema, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.warning(f"提取类型信息失败: {e}")
-            # 降级方案：尝试从类型注解中提取
-            type_info = cls._extract_type_info_fallback(target_type)
+            logger.error(f"无法为类型 {target_type} 生成 JSON Schema: {e}")
+            raise ValueError(f"Unsupported type for JSON schema generation: {target_type}") from e
 
-        return type_info
+        # 默认的格式要求指令
+        default_instructions = (
+            "Always respond strictly in the following JSON format with no additional explanatory text."
+        )
 
-    @classmethod
-    def _schema_type_to_readable(cls, schema_type: str) -> str:
-        """将 JSON Schema 类型转换为可读的英文类型名"""
-        type_mapping = {
-            "string": "string",
-            "integer": "integer",
-            "number": "number",
-            "boolean": "boolean",
-            "array": "array",
-            "object": "object",
-            "null": "null"
-        }
-        return type_mapping.get(schema_type, schema_type)
+        # 组合指令：JSON Schema + 自定义指令（或默认指令）
+        instructions = custom_instructions if custom_instructions else default_instructions
 
-    @classmethod
-    def _extract_type_info_fallback(cls, target_type: type[Any]) -> dict[str, Any]:
-        """降级方案：从类型注解中提取信息"""
-        type_info = {
-            "fields": {},
-            "has_required_fields": True
-        }
+        return f"JSON Schema:\n{schema_text}\n\n{instructions}"
 
-        # 这里可以添加更多的降级逻辑
-        # 例如检查 dataclass、TypedDict 等
 
-        return type_info
 
 
 

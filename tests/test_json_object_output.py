@@ -67,14 +67,17 @@ class TestJsonObjectOutputSchema:
 
     def test_custom_instructions(self):
         """测试自定义指令"""
-        custom_instructions = "请返回用户信息的 JSON 对象"
+        custom_instructions = "Please return user information as JSON with examples."
 
         schema = JsonObjectOutputSchema(
             UserProfile,
             custom_instructions=custom_instructions
         )
 
-        assert schema.generated_instructions == custom_instructions
+        # 应该包含 JSON Schema 和自定义指令
+        assert "JSON Schema:" in schema.generated_instructions
+        assert custom_instructions in schema.generated_instructions
+        assert '"properties"' in schema.generated_instructions
 
     def test_valid_json_validation_pydantic(self):
         """测试有效 JSON 验证 - Pydantic 模型"""
@@ -182,32 +185,38 @@ class TestInstructionGenerator:
         """测试基本指令生成"""
         instructions = InstructionGenerator.generate_json_instructions(UserProfile)
 
-        assert "Return a JSON object with the following fields:" in instructions
-        assert "name (string):" in instructions
-        assert "age (integer):" in instructions
-        assert "All fields are required." in instructions
-        assert "Output only valid JSON with no additional text or explanations." in instructions
+        assert "JSON Schema:" in instructions
+        assert '"type": "string"' in instructions
+        assert '"type": "integer"' in instructions
+        assert '"type": "boolean"' in instructions
+        assert "Always respond strictly in the following JSON format with no additional explanatory text." in instructions
 
-    def test_generate_instructions_simplified(self):
-        """测试简化的指令生成"""
+    def test_generate_instructions_with_schema(self):
+        """测试生成的指令包含完整的 JSON Schema"""
         instructions = InstructionGenerator.generate_json_instructions(UserProfile)
 
-        assert "Return a JSON object with the following fields:" in instructions
-        assert "name (string):" in instructions
-        assert "Output only valid JSON" in instructions
+        # 验证包含 JSON Schema
+        assert "JSON Schema:" in instructions
+        assert '"properties"' in instructions
+        assert '"required"' in instructions
+        assert '"name"' in instructions
+        assert '"age"' in instructions
 
 
 
-    def test_custom_instructions_override(self):
-        """测试自定义指令覆盖"""
-        custom_instructions = "这是自定义指令"
+    def test_custom_instructions_append(self):
+        """测试自定义指令附加到 JSON Schema 后面"""
+        custom_instructions = "Please include examples in your response."
 
         instructions = InstructionGenerator.generate_json_instructions(
             UserProfile,
             custom_instructions=custom_instructions
         )
 
-        assert instructions == custom_instructions
+        # 应该包含 JSON Schema 和自定义指令
+        assert "JSON Schema:" in instructions
+        assert custom_instructions in instructions
+        assert '"properties"' in instructions
 
 
 
@@ -226,10 +235,9 @@ class TestErrorHandling:
         class ProblematicType:
             pass
 
-        # 应该返回基础指令而不抛出异常
-        instructions = InstructionGenerator.generate_json_instructions(ProblematicType)
-        assert "Return a JSON object" in instructions
-        assert "Output only valid JSON" in instructions
+        # 应该抛出异常而不是返回基础指令
+        with pytest.raises(ValueError, match="Unsupported type for JSON schema generation"):
+            InstructionGenerator.generate_json_instructions(ProblematicType)
 
     def test_validation_error_logging(self):
         """测试验证错误日志记录"""
