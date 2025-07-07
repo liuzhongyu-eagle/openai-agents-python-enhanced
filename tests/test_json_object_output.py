@@ -142,7 +142,8 @@ class TestJsonObjectOutputSchema:
         with pytest.raises(ModelBehaviorError) as exc_info:
             schema.validate_json(invalid_json)
 
-        assert "不是有效的 JSON" in str(exc_info.value)
+        # 新的错误消息包含修复尝试信息
+        assert "JSON 无效" in str(exc_info.value) or "修复失败" in str(exc_info.value)
 
     def test_invalid_json_structure(self):
         """测试无效 JSON 结构（简化版，只有严格验证）"""

@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, TypeAdapter
 from typing_extensions import TypedDict, get_args, get_origin
@@ -8,7 +8,8 @@ from typing_extensions import TypedDict, get_args, get_origin
 from .exceptions import ModelBehaviorError, UserError
 from .strict_schema import ensure_strict_json_schema
 from .tracing import SpanError
-from .util import _error_tracing, _json
+from .util import _error_tracing
+from .util._json_repair import validate_json_with_repair
 
 _WRAPPER_DICT_KEY = "response"
 
@@ -80,7 +81,8 @@ class AgentOutputSchema(AgentOutputSchemaBase):
         self,
         output_type: type[Any],
         strict_json_schema: bool = True,
-        fallback_to_json_object: bool = False
+        fallback_to_json_object: bool = False,
+        enable_json_repair: bool = True
     ):
         """
         Args:
@@ -89,10 +91,12 @@ class AgentOutputSchema(AgentOutputSchemaBase):
                 setting this to True, as it increases the likelihood of correct JSON input.
             fallback_to_json_object: Whether to automatically fallback to json_object mode when
                 the model doesn't support json_schema. This enables smart fallback compatibility.
+            enable_json_repair: Whether to enable JSON repair functionality for malformed JSON.
         """
         self.output_type = output_type
         self._strict_json_schema = strict_json_schema
         self.fallback_to_json_object = fallback_to_json_object
+        self._enable_json_repair = enable_json_repair
 
         if output_type is None or output_type is str:
             self._is_wrapped = False
@@ -189,11 +193,25 @@ class AgentOutputSchema(AgentOutputSchemaBase):
             raise UserError("Output type is plain text, so no JSON schema is available")
         return self._output_schema
 
-    def validate_json(self, json_str: str) -> Any:
+    def validate_json(self, json_str: str, enable_repair: Optional[bool] = None) -> Any:
         """Validate a JSON string against the output type. Returns the validated object, or raises
         a `ModelBehaviorError` if the JSON is invalid.
+
+        Args:
+            json_str: JSON string to validate
+            enable_repair: Whether to enable JSON repair functionality
+                (None to use instance setting)
         """
-        validated = _json.validate_json(json_str, self._type_adapter, partial=False)
+        # 使用实例配置或参数指定的修复设置
+        repair_enabled = enable_repair if enable_repair is not None else self._enable_json_repair
+
+        # 使用带修复功能的验证
+        validated = validate_json_with_repair(
+            json_str,
+            self._type_adapter,
+            enable_repair=repair_enabled,
+            partial=False
+        )
         if self._is_wrapped:
             if not isinstance(validated, dict):
                 _error_tracing.attach_error_to_current_span(

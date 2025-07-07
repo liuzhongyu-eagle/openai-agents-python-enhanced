@@ -386,7 +386,8 @@ class TestEndToEndFunctionality:
         with pytest.raises(ModelBehaviorError) as exc_info:
             output_schema.validate_json("invalid json")
 
-        assert "不是有效的 JSON" in str(exc_info.value)
+        # 新的错误消息包含修复尝试信息
+        assert "JSON 无效" in str(exc_info.value) or "修复失败" in str(exc_info.value)
 
         # 测试类型不匹配
         invalid_json = json.dumps({

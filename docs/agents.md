@@ -127,6 +127,46 @@ schema = JsonObjectOutputSchema(
 )
 ```
 
+#### JSON Repair Functionality
+
+The SDK includes powerful JSON repair capabilities to handle malformed LLM outputs:
+
+```python
+# JSON repair is enabled by default
+schema = JsonObjectOutputSchema(UserProfile)
+
+# Test with broken JSON
+broken_json = """{
+    name: "张三",        // Missing quotes
+    age: 25,
+    city: "北京",
+    is_active: true,
+    interests: ["编程", "阅读",],  // Trailing comma
+}"""
+
+# Automatically repairs and validates
+try:
+    result = schema.validate_json(broken_json)
+    print(f"Repaired successfully: {result}")
+except ModelBehaviorError as e:
+    print(f"Repair failed: {e}")
+
+# Disable repair if needed
+schema_no_repair = JsonObjectOutputSchema(
+    UserProfile,
+    enable_json_repair=False
+)
+```
+
+**Supported repair types:**
+- Missing quotes around property names
+- Trailing commas
+- Single quotes instead of double quotes
+- Incomplete JSON structures
+- Other common format errors
+
+**Performance:** The repair process is highly optimized and typically adds only 1-10ms overhead.
+
 #### Factory Methods
 
 ```python
