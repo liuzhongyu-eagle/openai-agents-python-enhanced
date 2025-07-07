@@ -12,7 +12,6 @@ JsonObjectOutputSchema 核心功能测试
 import json
 from dataclasses import dataclass
 from typing import Optional
-from unittest.mock import Mock
 
 import pytest
 from pydantic import BaseModel, Field
@@ -189,7 +188,8 @@ class TestInstructionGenerator:
         assert '"type": "string"' in instructions
         assert '"type": "integer"' in instructions
         assert '"type": "boolean"' in instructions
-        assert "Always respond strictly in the following JSON format with no additional explanatory text." in instructions
+        assert ("Always respond strictly in the following JSON format "
+                "with no additional explanatory text.") in instructions
 
     def test_generate_instructions_with_schema(self):
         """测试生成的指令包含完整的 JSON Schema"""

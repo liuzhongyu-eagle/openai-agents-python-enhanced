@@ -51,7 +51,8 @@ class InstructionGenerator:
 
         # 默认的格式要求指令
         default_instructions = (
-            "Always respond strictly in the following JSON format with no additional explanatory text."
+            "Always respond strictly in the following JSON format "
+            "with no additional explanatory text."
         )
 
         # 组合指令：JSON Schema + 自定义指令（或默认指令）
@@ -85,7 +86,8 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
 
         Args:
             target_type: Target Python type (Pydantic model, dataclass, etc.)
-            custom_instructions: Custom instructions (if provided, will override auto-generated instructions)
+            custom_instructions: Custom instructions (if provided, will override
+                auto-generated instructions)
             enable_json_repair: Whether to enable JSON repair functionality
         """
         self._target_type = target_type

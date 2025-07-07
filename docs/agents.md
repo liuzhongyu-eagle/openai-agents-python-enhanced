@@ -128,14 +128,44 @@ agent = Agent(
 
 #### Custom Instructions
 
+The `custom_instructions` parameter allows you to provide additional instructions that will be appended after the JSON Schema. This is useful for adding examples, special formatting requirements, or domain-specific guidance.
+
 ```python
-# Override auto-generated instructions with custom ones
+# Default behavior - uses standard JSON Schema + simple instruction
+schema = JsonObjectOutputSchema(UserProfile)
+# Generates: JSON Schema + "Always respond strictly in the following JSON format with no additional explanatory text."
+
+# Custom instructions with examples
 schema = JsonObjectOutputSchema(
     UserProfile,
     custom_instructions="""Return a JSON object with user profile information.
-    Include all required fields. Output only valid JSON with no additional text."""
+
+Example:
+{
+  "name": "John Doe",
+  "age": 25,
+  "city": "Beijing",
+  "is_active": true,
+  "interests": ["reading", "coding"]
+}
+
+Output only valid JSON with no additional text or explanations."""
+)
+
+# Custom instructions for specific requirements
+schema = JsonObjectOutputSchema(
+    UserProfile,
+    custom_instructions="""Please ensure:
+1. All string values are properly escaped
+2. Age must be a positive integer
+3. City names should be in title case
+4. Interests array should contain at least one item
+
+Output only valid JSON."""
 )
 ```
+
+The final instruction will be: `JSON Schema + "\n\n" + custom_instructions`
 
 #### JSON Repair Functionality
 
