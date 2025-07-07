@@ -182,19 +182,19 @@ class TestInstructionGenerator:
         """测试基本指令生成"""
         instructions = InstructionGenerator.generate_json_instructions(UserProfile)
 
-        assert "请返回一个严格符合 JSON 格式的对象" in instructions
-        assert "name (字符串): 用户的姓名" in instructions
-        assert "age (整数): 用户的年龄" in instructions
-        assert "示例输出：" in instructions
-        assert "请确保输出严格符合 JSON 语法" in instructions
+        assert "Return a JSON object with the following fields:" in instructions
+        assert "name (string):" in instructions
+        assert "age (integer):" in instructions
+        assert "All fields are required." in instructions
+        assert "Output only valid JSON with no additional text or explanations." in instructions
 
     def test_generate_instructions_simplified(self):
-        """测试简化的指令生成（固定中文+示例）"""
+        """测试简化的指令生成"""
         instructions = InstructionGenerator.generate_json_instructions(UserProfile)
 
-        assert "请返回一个严格符合 JSON 格式的对象" in instructions
-        assert "name (字符串): 用户的姓名" in instructions
-        assert "示例输出：" in instructions
+        assert "Return a JSON object with the following fields:" in instructions
+        assert "name (string):" in instructions
+        assert "Output only valid JSON" in instructions
 
 
 
@@ -228,7 +228,8 @@ class TestErrorHandling:
 
         # 应该返回基础指令而不抛出异常
         instructions = InstructionGenerator.generate_json_instructions(ProblematicType)
-        assert "请返回一个严格符合 JSON 格式的对象" in instructions
+        assert "Return a JSON object" in instructions
+        assert "Output only valid JSON" in instructions
 
     def test_validation_error_logging(self):
         """测试验证错误日志记录"""

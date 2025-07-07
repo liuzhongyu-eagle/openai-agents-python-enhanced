@@ -57,49 +57,37 @@ class InstructionGenerator:
 
     @classmethod
     def _generate_simple_instruction(cls, target_type: type[Any]) -> str:
-        """生成简化的指令（固定中文+示例）"""
+        """生成简化的指令（基于用户定义的 schema）"""
         try:
             # 提取类型信息
             type_info = cls._extract_type_info(target_type)
 
             # 构建简化指令
-            instruction_parts = ["请返回一个严格符合 JSON 格式的对象，包含以下字段："]
+            instruction_parts = ["Return a JSON object with the following fields:"]
 
             # 添加字段描述
             for field_name, field_info in type_info.get("fields", {}).items():
                 field_line = (
                     f"- {field_name} ({field_info.get('type', 'unknown')}): "
-                    f"{field_info.get('description', '无描述')}"
+                    f"{field_info.get('description', 'No description')}"
                 )
                 instruction_parts.append(field_line)
 
             # 添加必需字段说明
             if type_info.get("has_required_fields", True):
-                instruction_parts.append("所有字段都是必需的。")
-
-            # 添加简单示例
-            try:
-                example = cls._generate_example(target_type)
-                if example:
-                    instruction_parts.extend([
-                        "",  # 空行
-                        "示例输出：",
-                        example
-                    ])
-            except Exception:
-                pass  # 忽略示例生成错误
+                instruction_parts.append("All fields are required.")
 
             # 添加格式说明
             instruction_parts.append("")
-            instruction_parts.append("请确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。")
+            instruction_parts.append("Output only valid JSON with no additional text or explanations.")
 
             return "\n".join(instruction_parts)
 
         except Exception as e:
             logger.error(f"生成简化指令失败: {e}")
             return (
-                "请返回一个严格符合 JSON 格式的对象。"
-                "确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。"
+                "Return a valid JSON object. "
+                "Output only valid JSON with no additional text or explanations."
             )
 
 
@@ -144,15 +132,15 @@ class InstructionGenerator:
 
     @classmethod
     def _schema_type_to_readable(cls, schema_type: str) -> str:
-        """将 JSON Schema 类型转换为可读的中文类型名"""
+        """将 JSON Schema 类型转换为可读的英文类型名"""
         type_mapping = {
-            "string": "字符串",
-            "integer": "整数",
-            "number": "数字",
-            "boolean": "布尔值",
-            "array": "数组",
-            "object": "对象",
-            "null": "空值"
+            "string": "string",
+            "integer": "integer",
+            "number": "number",
+            "boolean": "boolean",
+            "array": "array",
+            "object": "object",
+            "null": "null"
         }
         return type_mapping.get(schema_type, schema_type)
 
@@ -169,64 +157,16 @@ class InstructionGenerator:
 
         return type_info
 
-    @classmethod
-    def _generate_example(cls, target_type: type[Any]) -> Optional[str]:
-        """生成示例 JSON 输出"""
-        try:
-            # 使用 TypeAdapter 生成示例
-            adapter = TypeAdapter(target_type)
-            schema = adapter.json_schema()
 
-            # 基于 schema 生成示例数据
-            example_data = cls._generate_example_from_schema(schema)
-
-            if example_data is not None:
-                return json.dumps(example_data, ensure_ascii=False, indent=2)
-
-        except Exception as e:
-            logger.warning(f"生成示例失败: {e}")
-
-        return None
-
-    @classmethod
-    def _generate_example_from_schema(cls, schema: dict[str, Any]) -> Any:
-        """基于 JSON Schema 生成示例数据"""
-        schema_type = schema.get("type")
-
-        if schema_type == "object":
-            example = {}
-            properties = schema.get("properties", {})
-            for field_name, field_schema in properties.items():
-                example[field_name] = cls._generate_example_from_schema(field_schema)
-            return example
-
-        elif schema_type == "array":
-            items_schema = schema.get("items", {"type": "string"})
-            example_item = cls._generate_example_from_schema(items_schema)
-            return [example_item]
-
-        elif schema_type == "string":
-            return "示例文本"
-
-        elif schema_type == "integer":
-            return 42
-
-        elif schema_type == "number":
-            return 3.14
-
-        elif schema_type == "boolean":
-            return True
-
-        else:
-            return None
 
 
 class JsonObjectOutputSchema(AgentOutputSchemaBase):
     """
-    兼容仅支持 json_object 格式的 LLM 供应商的输出模式
+    Compatible output schema for LLM providers that only support {'type': 'json_object'} format.
 
-    该类向 LLM 供应商声明输出格式为通用 JSON 对象，
-    同时在本地进行严格的类型验证。
+    This class declares the output format as a generic JSON object to the LLM provider,
+    while performing strict type validation locally. Instructions are generated based on
+    the user-defined schema and injected into the system prompt.
     """
 
     def __init__(
@@ -237,12 +177,12 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         enable_json_repair: bool = True
     ):
         """
-        初始化 JsonObjectOutputSchema
+        Initialize JsonObjectOutputSchema
 
         Args:
-            target_type: 目标 Python 类型（Pydantic 模型、dataclass 等）
-            custom_instructions: 自定义指令（如果提供，将覆盖自动生成的指令）
-            enable_json_repair: 是否启用 JSON 修复功能
+            target_type: Target Python type (Pydantic model, dataclass, etc.)
+            custom_instructions: Custom instructions (if provided, will override auto-generated instructions)
+            enable_json_repair: Whether to enable JSON repair functionality
         """
         self._target_type = target_type
         self._custom_instructions = custom_instructions

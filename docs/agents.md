@@ -122,7 +122,7 @@ agent = Agent(
 
 - **Explicit Control**: Business layer explicitly chooses the appropriate schema
 - **Automatic Prompt Injection**: Injects JSON schema instructions into system prompts for `json_object` mode
-- **Chinese Instructions**: Generates clear Chinese instructions with examples
+- **User-Controlled Instructions**: Generates instructions based on user-defined schema language and descriptions
 - **Type Safety**: Maintains strict Pydantic validation with JSON repair capabilities
 - **Simplified Design**: No complex auto-detection, just clear business logic
 
@@ -132,7 +132,8 @@ agent = Agent(
 # Override auto-generated instructions with custom ones
 schema = JsonObjectOutputSchema(
     UserProfile,
-    custom_instructions="请返回用户个人资料的 JSON 对象，包含所有必需字段。"
+    custom_instructions="""Return a JSON object with user profile information.
+    Include all required fields. Output only valid JSON with no additional text."""
 )
 ```
 

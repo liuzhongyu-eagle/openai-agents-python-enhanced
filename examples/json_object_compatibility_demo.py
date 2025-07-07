@@ -190,16 +190,17 @@ def demo_custom_instructions():
     print("5. 自定义指令演示")
     print("=" * 60)
 
-    custom_instructions = """
-请返回一个包含用户信息的 JSON 对象。
-必须包含以下字段：
-- name: 用户姓名（字符串）
-- age: 用户年龄（数字，0-150）
-- city: 居住城市（字符串）
-- is_active: 是否活跃（布尔值）
-- interests: 兴趣爱好（字符串数组）
+    custom_instructions = """Return a JSON object containing user information.
+Required fields:
+- name: User's full name (string)
+- age: User's age (number, 0-150)
+- city: User's city (string)
+- is_active: Whether user is active (boolean)
+- interests: User's interests (array of strings)
 
-示例：{"name": "示例用户", "age": 25, "city": "北京", "is_active": true, "interests": ["阅读"]}
+Example: {"name": "John Doe", "age": 25, "city": "Beijing", "is_active": true, "interests": ["reading", "coding"]}
+
+Output only valid JSON with no additional text or explanations.
 """
 
     schema = JsonObjectOutputSchema(
