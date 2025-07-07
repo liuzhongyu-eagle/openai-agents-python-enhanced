@@ -69,11 +69,12 @@ class Converter:
 
     @classmethod
     def convert_response_format(
-        cls, final_output_schema: AgentOutputSchemaBase | None
+        cls, final_output_schema: AgentOutputSchemaBase | None, model=None
     ) -> ResponseFormat | NotGiven:
         if not final_output_schema or final_output_schema.is_plain_text():
             return NOT_GIVEN
 
+        # 使用 json_schema 模式
         return {
             "type": "json_schema",
             "json_schema": {

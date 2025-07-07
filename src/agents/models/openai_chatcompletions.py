@@ -226,11 +226,37 @@ class OpenAIChatCompletionsModel(Model):
     ) -> ChatCompletion | tuple[Response, AsyncStream[ChatCompletionChunk]]:
         converted_messages = Converter.items_to_messages(input)
 
-        if system_instructions:
+        # 处理系统指令和 schema 注入
+        final_system_instructions = system_instructions
+
+        # 检查是否需要注入 JSON schema 指令
+        if output_schema:
+            schema_injection = ""
+
+            # 检查 JsonObjectOutputSchema 的注入需求
+            if (hasattr(output_schema, 'should_inject_to_system_prompt') and
+                hasattr(output_schema, 'get_system_prompt_injection')):
+                if callable(output_schema.should_inject_to_system_prompt):
+                    # JsonObjectOutputSchema 总是需要注入
+                    if output_schema.should_inject_to_system_prompt():
+                        schema_injection = output_schema.get_system_prompt_injection()
+                else:
+                    # AgentOutputSchema 需要检查模型能力
+                    if output_schema.should_inject_to_system_prompt(self.model):
+                        schema_injection = output_schema.get_system_prompt_injection()
+
+            # 将 schema 指令添加到系统提示词中
+            if schema_injection:
+                if final_system_instructions:
+                    final_system_instructions = f"{final_system_instructions}\n\n{schema_injection}"
+                else:
+                    final_system_instructions = schema_injection
+
+        if final_system_instructions:
             converted_messages.insert(
                 0,
                 {
-                    "content": system_instructions,
+                    "content": final_system_instructions,
                     "role": "system",
                 },
             )
@@ -245,7 +271,7 @@ class OpenAIChatCompletionsModel(Model):
             else NOT_GIVEN
         )
         tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
-        response_format = Converter.convert_response_format(output_schema)
+        response_format = Converter.convert_response_format(output_schema, self.model)
 
         converted_tools = [Converter.tool_to_openai(tool) for tool in tools] if tools else []
 
