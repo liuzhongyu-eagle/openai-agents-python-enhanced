@@ -66,16 +66,13 @@ class TestJsonObjectOutputSchema:
         assert schema.json_schema() == {"type": "object"}
         assert not schema.is_strict_json_schema()
 
-    def test_custom_configuration(self):
-        """测试自定义配置"""
+    def test_custom_instructions(self):
+        """测试自定义指令"""
         custom_instructions = "请返回用户信息的 JSON 对象"
 
         schema = JsonObjectOutputSchema(
             UserProfile,
-            instruction_language="en",
-            include_examples=False,
-            custom_instructions=custom_instructions,
-            validation_mode="lenient"
+            custom_instructions=custom_instructions
         )
 
         assert schema.generated_instructions == custom_instructions
@@ -147,9 +144,9 @@ class TestJsonObjectOutputSchema:
 
         assert "不是有效的 JSON" in str(exc_info.value)
 
-    def test_invalid_json_structure_strict_mode(self):
-        """测试无效 JSON 结构 - 严格模式"""
-        schema = JsonObjectOutputSchema(UserProfile, validation_mode="strict")
+    def test_invalid_json_structure(self):
+        """测试无效 JSON 结构（简化版，只有严格验证）"""
+        schema = JsonObjectOutputSchema(UserProfile)
 
         invalid_json = json.dumps({
             "name": "张三",
@@ -162,22 +159,6 @@ class TestJsonObjectOutputSchema:
             schema.validate_json(invalid_json)
 
         assert "不符合预期类型" in str(exc_info.value)
-
-    def test_invalid_json_structure_lenient_mode(self):
-        """测试无效 JSON 结构 - 宽松模式"""
-        schema = JsonObjectOutputSchema(UserProfile, validation_mode="lenient")
-
-        invalid_json = json.dumps({
-            "name": "张三",
-            "age": "二十五",  # 应该是数字，不是字符串
-            "city": "北京",
-            "is_active": True
-        }, ensure_ascii=False)
-
-        # 宽松模式应该返回原始对象而不抛出异常
-        result = schema.validate_json(invalid_json)
-        assert isinstance(result, dict)
-        assert result["name"] == "张三"
 
     def test_factory_methods(self):
         """测试工厂方法"""
@@ -211,28 +192,26 @@ class TestInstructionGenerator:
         assert "示例输出：" in instructions
         assert "请确保输出严格符合 JSON 语法" in instructions
 
-    def test_generate_instructions_english(self):
-        """测试英文指令生成"""
-        instructions = InstructionGenerator.generate_json_instructions(
-            UserProfile,
-            language="en",
-            include_examples=True
-        )
-
-        assert "Please return a JSON object with the following fields:" in instructions
-        assert "Example output:" in instructions
-        assert "Ensure the output strictly follows JSON syntax" in instructions
-
-    def test_generate_instructions_without_examples(self):
-        """测试不包含示例的指令生成"""
-        instructions = InstructionGenerator.generate_json_instructions(
-            UserProfile,
-            language="zh",
-            include_examples=False
-        )
+    def test_generate_instructions_simplified(self):
+        """测试简化的指令生成（固定中文+示例）"""
+        instructions = InstructionGenerator.generate_json_instructions(UserProfile)
 
         assert "请返回一个严格符合 JSON 格式的对象" in instructions
-        assert "示例输出：" not in instructions
+        assert "name (字符串): 用户的姓名" in instructions
+        assert "示例输出：" in instructions
+
+    def test_generate_instructions_legacy_params(self):
+        """测试传统参数的兼容性（但实际被忽略）"""
+        # 传统参数会被忽略，但不会报错
+        instructions = InstructionGenerator.generate_json_instructions(
+            UserProfile,
+            language="en",  # 被忽略，仍使用中文
+            include_examples=False  # 被忽略，仍包含示例
+        )
+
+        # 实际仍然是中文+示例
+        assert "请返回一个严格符合 JSON 格式的对象" in instructions
+        assert "示例输出：" in instructions
 
     def test_custom_instructions_override(self):
         """测试自定义指令覆盖"""

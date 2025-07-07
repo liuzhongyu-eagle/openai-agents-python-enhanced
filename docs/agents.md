@@ -117,16 +117,13 @@ agent = Agent(
 - **Type Safety**: Maintains strict Pydantic validation regardless of the underlying format
 - **Backwards Compatible**: Existing `AgentOutputSchema` usage continues to work unchanged
 
-#### Configuration Options
+#### Custom Instructions
 
 ```python
-# Customize instruction generation
+# Override auto-generated instructions with custom ones
 schema = JsonObjectOutputSchema(
     UserProfile,
-    instruction_language="en",           # "zh" (Chinese) or "en" (English)
-    include_examples=True,               # Include JSON examples in instructions
-    custom_instructions="Custom format instructions",  # Override auto-generated instructions
-    validation_mode="strict"             # "strict" or "lenient" validation
+    custom_instructions="请返回用户个人资料的 JSON 对象，包含所有必需字段。"
 )
 ```
 

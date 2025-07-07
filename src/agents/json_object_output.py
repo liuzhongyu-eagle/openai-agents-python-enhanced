@@ -82,28 +82,9 @@ class ModelCapabilityDetector:
 
 
 class InstructionGenerator:
-    """智能指令生成器，为 JsonObjectOutputSchema 生成结构化指令"""
+    """简化的指令生成器，为 JsonObjectOutputSchema 生成结构化指令"""
 
-    # 指令模板
-    INSTRUCTION_TEMPLATES = {
-        "zh": {
-            "base": "请返回一个严格符合 JSON 格式的对象，包含以下字段：",
-            "field": "- {name} ({type}): {description}",
-            "example": "示例输出：",
-            "format_note": "请确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。",
-            "required_note": "所有字段都是必需的。"
-        },
-        "en": {
-            "base": "Please return a JSON object with the following fields:",
-            "field": "- {name} ({type}): {description}",
-            "example": "Example output:",
-            "format_note": ("Ensure the output strictly follows JSON syntax "
-                           "with all string values in double quotes."),
-            "required_note": "All fields are required."
-        }
-    }
-
-    # 指令缓存
+    # 指令缓存（简化键）
     _instruction_cache: dict[tuple[Any, ...], str] = {}
 
     @classmethod
@@ -115,12 +96,12 @@ class InstructionGenerator:
         custom_instructions: Optional[str] = None
     ) -> str:
         """
-        基于目标类型生成 JSON 输出指令
+        基于目标类型生成 JSON 输出指令（简化版）
 
         Args:
             target_type: 目标 Python 类型
-            language: 指令语言（"zh" 或 "en"）
-            include_examples: 是否包含示例
+            language: 指令语言（保留兼容性，但固定使用中文）
+            include_examples: 是否包含示例（保留兼容性，但固定包含）
             custom_instructions: 自定义指令（如果提供，将覆盖自动生成的指令）
 
         Returns:
@@ -130,17 +111,15 @@ class InstructionGenerator:
         if custom_instructions:
             return custom_instructions
 
-        # 检查缓存
+        # 简化：固定使用中文和包含示例，检查缓存
         if _ENABLE_INSTRUCTION_CACHE:
-            cache_key = (target_type, language, include_examples)
+            cache_key = (target_type,)  # 简化缓存键
             if cache_key in cls._instruction_cache:
                 return cls._instruction_cache[cache_key]
 
         try:
-            # 生成指令
-            instruction = cls._generate_instruction_for_type(
-                target_type, language, include_examples
-            )
+            # 生成简化指令（固定中文+示例）
+            instruction = cls._generate_simple_instruction(target_type)
 
             # 缓存指令
             if _ENABLE_INSTRUCTION_CACHE:
@@ -151,58 +130,50 @@ class InstructionGenerator:
         except Exception as e:
             logger.error(f"生成指令失败: {e}")
             # 返回基础指令作为降级方案
-            templates = cls.INSTRUCTION_TEMPLATES.get(language, cls.INSTRUCTION_TEMPLATES["zh"])
-            return f"{templates['base']}\n{templates['format_note']}"
+            return "请返回一个严格符合 JSON 格式的对象。确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。"
 
     @classmethod
-    def _generate_instruction_for_type(
-        cls,
-        target_type: type[Any],
-        language: str,
-        include_examples: bool
-    ) -> str:
-        """为特定类型生成指令"""
-        templates = cls.INSTRUCTION_TEMPLATES.get(language, cls.INSTRUCTION_TEMPLATES["zh"])
+    def _generate_simple_instruction(cls, target_type: type[Any]) -> str:
+        """生成简化的指令（固定中文+示例）"""
+        try:
+            # 提取类型信息
+            type_info = cls._extract_type_info(target_type)
 
-        # 提取类型信息
-        type_info = cls._extract_type_info(target_type)
+            # 构建简化指令
+            instruction_parts = ["请返回一个严格符合 JSON 格式的对象，包含以下字段："]
 
-        # 构建指令
-        instruction_parts = [templates["base"]]
+            # 添加字段描述
+            for field_name, field_info in type_info.get("fields", {}).items():
+                field_line = f"- {field_name} ({field_info.get('type', 'unknown')}): {field_info.get('description', '无描述')}"
+                instruction_parts.append(field_line)
 
-        # 添加字段描述
-        for field_name, field_info in type_info.get("fields", {}).items():
-            field_line = templates["field"].format(
-                name=field_name,
-                type=field_info.get("type", "unknown"),
-                description=field_info.get("description", "无描述")
-            )
-            instruction_parts.append(field_line)
+            # 添加必需字段说明
+            if type_info.get("has_required_fields", True):
+                instruction_parts.append("所有字段都是必需的。")
 
-        # 添加必需字段说明
-        if type_info.get("has_required_fields", True):
-            instruction_parts.append(templates["required_note"])
-
-        # 添加示例
-        if include_examples:
+            # 添加简单示例
             try:
                 example = cls._generate_example(target_type)
                 if example:
                     instruction_parts.extend([
                         "",  # 空行
-                        templates["example"],
+                        "示例输出：",
                         example
                     ])
-            except Exception as e:
-                logger.warning(f"生成示例失败: {e}")
+            except Exception:
+                pass  # 忽略示例生成错误
 
-        # 添加格式说明
-        instruction_parts.extend([
-            "",  # 空行
-            templates["format_note"]
-        ])
+            # 添加格式说明
+            instruction_parts.append("")
+            instruction_parts.append("请确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。")
 
-        return "\n".join(instruction_parts)
+            return "\n".join(instruction_parts)
+
+        except Exception as e:
+            logger.error(f"生成简化指令失败: {e}")
+            return "请返回一个严格符合 JSON 格式的对象。确保输出严格符合 JSON 语法，所有字符串值都用双引号包围。"
+
+
 
     @classmethod
     def _extract_type_info(cls, target_type: type[Any]) -> dict[str, Any]:
@@ -336,46 +307,31 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         self,
         target_type: type[Any],
         *,
-        instruction_language: Optional[str] = None,
-        include_examples: Optional[bool] = None,
-        custom_instructions: Optional[str] = None,
-        validation_mode: Optional[str] = None,
-        auto_generate_instructions: bool = True
+        custom_instructions: Optional[str] = None
     ):
         """
         初始化 JsonObjectOutputSchema
 
         Args:
             target_type: 目标 Python 类型（Pydantic 模型、dataclass 等）
-            instruction_language: 指令语言（"zh", "en"），默认使用全局配置
-            include_examples: 是否在指令中包含示例，默认使用全局配置
-            custom_instructions: 自定义指令（覆盖自动生成的指令）
-            validation_mode: 验证模式（"strict", "lenient"），默认使用全局配置
-            auto_generate_instructions: 是否自动生成指令
+            custom_instructions: 自定义指令（如果提供，将覆盖自动生成的指令）
         """
         self._target_type = target_type
-        self._instruction_language = instruction_language or _DEFAULT_LANGUAGE
-        self._include_examples = (
-            include_examples if include_examples is not None
-            else _DEFAULT_INCLUDE_EXAMPLES
-        )
         self._custom_instructions = custom_instructions
-        self._validation_mode = validation_mode or "strict"
-        self._auto_generate_instructions = auto_generate_instructions
 
         # 初始化验证器
         self._init_type_adapter()
 
-        # 生成指令
-        if auto_generate_instructions:
+        # 生成指令（简化版，固定使用中文和包含示例）
+        if custom_instructions:
+            self._generated_instructions = custom_instructions
+        else:
             self._generated_instructions = InstructionGenerator.generate_json_instructions(
                 target_type=target_type,
-                language=self._instruction_language,
-                include_examples=self._include_examples,
-                custom_instructions=custom_instructions
+                language="zh",  # 固定使用中文
+                include_examples=True,  # 固定包含示例
+                custom_instructions=None
             )
-        else:
-            self._generated_instructions = custom_instructions or ""
 
     def _init_type_adapter(self) -> None:
         """初始化类型适配器"""
@@ -416,10 +372,7 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         Returns:
             str: 需要注入到系统提示词中的指令文本
         """
-        if self._auto_generate_instructions:
-            return self._generated_instructions
-        else:
-            return self._custom_instructions or ""
+        return self._generated_instructions
 
     def should_inject_to_system_prompt(self) -> bool:
         """
@@ -466,23 +419,10 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
 
         except ValidationError as e:
             logger.error(f"类型验证失败: {e}")
-
-            if self._validation_mode == "lenient":
-                # 宽松模式：尝试部分验证
-                logger.warning("使用宽松验证模式，尝试部分验证")
-                return self._lenient_validation(json_obj, e)
-            else:
-                # 严格模式：抛出错误
-                raise ModelBehaviorError(
-                    f"LLM 生成的 JSON 无效，不符合预期类型 {self._target_type.__name__}: {e}"
-                ) from e
-
-    def _lenient_validation(self, json_obj: Any, error: ValidationError) -> Any:
-        """宽松验证模式的降级策略"""
-        logger.warning(f"宽松验证模式暂未实现，返回原始 JSON 对象: {error}")
-        # TODO: 实现宽松验证逻辑
-        # 例如：提取可用的字段，忽略无效字段等
-        return json_obj
+            # 简化：总是使用严格验证
+            raise ModelBehaviorError(
+                f"LLM 生成的 JSON 无效，不符合预期类型 {self._target_type.__name__}: {e}"
+            ) from e
 
     @property
     def generated_instructions(self) -> str:

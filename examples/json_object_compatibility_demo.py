@@ -87,30 +87,16 @@ def demo_json_object_output_schema():
 
 
 def demo_instruction_generator():
-    """演示智能指令生成器"""
+    """演示简化的指令生成器"""
     print("\n" + "=" * 60)
-    print("2. 智能指令生成器演示")
+    print("2. 简化指令生成器演示")
     print("=" * 60)
 
-    # 中文指令生成
-    print("中文指令:")
+    # 默认指令生成（固定中文+示例）
+    print("默认指令生成:")
     print("-" * 40)
-    zh_instructions = InstructionGenerator.generate_json_instructions(
-        UserProfile,
-        language="zh",
-        include_examples=True
-    )
-    print(zh_instructions)
-
-    # 英文指令生成
-    print("\n英文指令:")
-    print("-" * 40)
-    en_instructions = InstructionGenerator.generate_json_instructions(
-        UserProfile,
-        language="en",
-        include_examples=True
-    )
-    print(en_instructions)
+    default_instructions = InstructionGenerator.generate_json_instructions(UserProfile)
+    print(default_instructions)
 
     # 自定义指令
     print("\n自定义指令:")
@@ -226,32 +212,27 @@ def demo_agent_integration():
         print(f"- 启用降级: {smart_agent.output_type.fallback_to_json_object}")
 
 
-def demo_configuration():
-    """演示配置功能"""
+def demo_custom_instructions():
+    """演示自定义指令功能"""
     print("\n" + "=" * 60)
-    print("6. 简化配置演示")
+    print("6. 自定义指令演示")
     print("=" * 60)
 
-    print("配置已简化为常量，移除了复杂的全局配置类：")
-    print("- 默认语言: 中文 (zh)")
-    print("- 默认包含示例: True")
-    print("- 指令缓存: 启用")
-    print("- 验证器缓存: 启用")
+    print("简化设计：移除复杂的配置参数，专注于核心功能")
+    print("- 固定使用中文指令")
+    print("- 固定包含示例")
+    print("- 支持自定义指令覆盖")
 
-    print("\n如需自定义配置，可在创建时指定：")
-    print("# 英文指令")
-    en_schema = JsonObjectOutputSchema(
+    print("\n默认自动生成的指令:")
+    default_schema = JsonObjectOutputSchema(TaskItem)
+    print(default_schema.get_system_prompt_injection()[:150] + "...")
+
+    print("\n自定义指令:")
+    custom_schema = JsonObjectOutputSchema(
         TaskItem,
-        instruction_language="en",
-        include_examples=False
+        custom_instructions="请返回任务项目的 JSON 对象，包含标题、描述、优先级和完成状态。"
     )
-    print("英文模式下的指令 (前100字符):")
-    print(en_schema.get_system_prompt_injection()[:100] + "...")
-
-    print("\n# 中文指令（默认）")
-    zh_schema = JsonObjectOutputSchema(TaskItem)
-    print("中文模式下的指令 (前100字符):")
-    print(zh_schema.get_system_prompt_injection()[:100] + "...")
+    print(custom_schema.get_system_prompt_injection())
 
 
 def demo_factory_methods():
@@ -289,7 +270,7 @@ def main():
         demo_model_capability_detection()
         demo_smart_fallback()
         demo_agent_integration()
-        demo_configuration()
+        demo_custom_instructions()
         demo_factory_methods()
 
         print("\n" + "=" * 60)
@@ -302,7 +283,7 @@ def main():
         print("✅ 智能降级机制 - 自动降级到 json_object")
         print("✅ 提示词注入 - 自动注入 schema 指令")
         print("✅ 统一验证机制 - 严格类型检查")
-        print("✅ 简化配置 - 实例级配置，无全局状态")
+        print("✅ 简化设计 - 移除复杂配置，专注核心功能")
         print("✅ 工厂方法 - 便捷的创建方式")
 
     except Exception as e:

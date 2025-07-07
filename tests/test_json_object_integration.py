@@ -362,24 +362,21 @@ class TestEndToEndFunctionality:
         assert isinstance(result, UserProfile)
         assert result.name == "李四"
 
-    def test_instance_configuration(self):
-        """测试实例级配置（替代全局配置）"""
-        # 英文配置
-        en_schema = JsonObjectOutputSchema(
+    def test_simplified_configuration(self):
+        """测试简化的配置（移除复杂参数）"""
+        # 默认配置（固定中文+示例）
+        default_schema = JsonObjectOutputSchema(UserProfile)
+        instructions = default_schema.generated_instructions
+        assert "请返回一个严格符合 JSON 格式的对象" in instructions
+        assert "示例输出：" in instructions
+
+        # 自定义指令
+        custom_schema = JsonObjectOutputSchema(
             UserProfile,
-            instruction_language="en",
-            include_examples=False
+            custom_instructions="请返回用户信息的 JSON 对象"
         )
-
-        instructions = en_schema.generated_instructions
-        assert "Please return a JSON object" in instructions
-        assert "Example output:" not in instructions
-
-        # 中文配置（默认）
-        zh_schema = JsonObjectOutputSchema(UserProfile)
-        zh_instructions = zh_schema.generated_instructions
-        assert "请返回一个严格符合 JSON 格式的对象" in zh_instructions
-        assert "示例输出：" in zh_instructions
+        custom_instructions = custom_schema.generated_instructions
+        assert custom_instructions == "请返回用户信息的 JSON 对象"
 
     def test_error_handling_integration(self):
         """测试错误处理集成"""
