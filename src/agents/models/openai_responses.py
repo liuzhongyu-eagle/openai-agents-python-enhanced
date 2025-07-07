@@ -244,7 +244,33 @@ class OpenAIResponsesModel(Model):
 
         tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
         converted_tools = Converter.convert_tools(tools, handoffs)
-        response_format = Converter.get_response_format(output_schema)
+        response_format = Converter.get_response_format(output_schema, self.model)
+
+        # 处理系统指令和 schema 注入
+        final_system_instructions = system_instructions
+
+        # 检查是否需要注入 JSON schema 指令
+        if output_schema:
+            schema_injection = ""
+
+            # 检查 JsonObjectOutputSchema 的注入需求
+            if (hasattr(output_schema, 'should_inject_to_system_prompt') and
+                hasattr(output_schema, 'get_system_prompt_injection')):
+                if callable(output_schema.should_inject_to_system_prompt):
+                    # JsonObjectOutputSchema 总是需要注入
+                    if output_schema.should_inject_to_system_prompt():
+                        schema_injection = output_schema.get_system_prompt_injection()
+                else:
+                    # AgentOutputSchema 需要检查模型能力
+                    if output_schema.should_inject_to_system_prompt(self.model):
+                        schema_injection = output_schema.get_system_prompt_injection()
+
+            # 将 schema 指令添加到系统提示词中
+            if schema_injection:
+                if final_system_instructions:
+                    final_system_instructions = f"{final_system_instructions}\n\n{schema_injection}"
+                else:
+                    final_system_instructions = schema_injection
 
         include: list[ResponseIncludable] = converted_tools.includes
         if model_settings.response_include is not None:
@@ -265,7 +291,7 @@ class OpenAIResponsesModel(Model):
 
         return await self._client.responses.create(
             previous_response_id=self._non_null_or_not_given(previous_response_id),
-            instructions=self._non_null_or_not_given(system_instructions),
+            instructions=self._non_null_or_not_given(final_system_instructions),
             model=self.model,
             input=list_input,
             include=include,
@@ -345,19 +371,39 @@ class Converter:
 
     @classmethod
     def get_response_format(
-        cls, output_schema: AgentOutputSchemaBase | None
+        cls, output_schema: AgentOutputSchemaBase | None, model=None
     ) -> ResponseTextConfigParam | NotGiven:
         if output_schema is None or output_schema.is_plain_text():
             return NOT_GIVEN
-        else:
-            return {
-                "format": {
-                    "type": "json_schema",
-                    "name": "final_output",
-                    "schema": output_schema.json_schema(),
-                    "strict": output_schema.is_strict_json_schema(),
-                }
+
+        # 检查是否需要智能降级到 json_object
+        if (hasattr(output_schema, 'fallback_to_json_object') and
+            output_schema.fallback_to_json_object and
+            model is not None):
+
+            # 导入能力检测器（避免循环导入）
+            try:
+                from ..json_object_output import ModelCapabilityDetector
+                if not ModelCapabilityDetector.supports_json_schema(model):
+                    # 降级到 json_object 模式
+                    return {
+                        "format": {
+                            "type": "json_object"
+                        }
+                    }
+            except ImportError:
+                # 如果导入失败，继续使用 json_schema
+                pass
+
+        # 默认使用 json_schema 模式
+        return {
+            "format": {
+                "type": "json_schema",
+                "name": "final_output",
+                "schema": output_schema.json_schema(),
+                "strict": output_schema.is_strict_json_schema(),
             }
+        }
 
     @classmethod
     def convert_tools(

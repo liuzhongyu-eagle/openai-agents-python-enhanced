@@ -39,6 +39,12 @@ from .items import (
     ToolCallOutputItem,
     TResponseInputItem,
 )
+from .json_object_output import (
+    InstructionGenerator,
+    JsonObjectConfig,
+    JsonObjectOutputSchema,
+    ModelCapabilityDetector,
+)
 from .lifecycle import AgentHooks, RunHooks
 from .model_settings import ModelSettings
 from .models.interface import Model, ModelProvider, ModelTracing
@@ -178,6 +184,10 @@ __all__ = [
     "OpenAIResponsesModel",
     "AgentOutputSchema",
     "AgentOutputSchemaBase",
+    "JsonObjectOutputSchema",
+    "JsonObjectConfig",
+    "ModelCapabilityDetector",
+    "InstructionGenerator",
     "Computer",
     "AsyncComputer",
     "Environment",
