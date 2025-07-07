@@ -68,6 +68,160 @@ agent = Agent(
 
     When you pass an `output_type`, that tells the model to use [structured outputs](https://platform.openai.com/docs/guides/structured-outputs) instead of regular plain text responses.
 
+### JSON Object Output Compatibility
+
+For LLM providers that only support `{'type': 'json_object'}` format (instead of the more advanced `json_schema`), the SDK provides `JsonObjectOutputSchema` for explicit compatibility handling.
+
+#### Business Layer Routing
+
+The recommended approach is to let the business layer choose the appropriate schema based on model capabilities:
+
+```python
+from agents import Agent, AgentOutputSchema, JsonObjectOutputSchema
+from pydantic import BaseModel, Field
+
+class UserProfile(BaseModel):
+    name: str = Field(description="用户的姓名")
+    age: int = Field(description="用户的年龄", ge=0, le=150)
+    city: str = Field(description="用户居住的城市")
+    is_active: bool = Field(description="用户当前是否活跃")
+
+def create_agent(model):
+    """Business layer controls schema selection based on model capabilities"""
+    if model_supports_json_schema(model):
+        # Use standard json_schema for advanced models
+        output_type = AgentOutputSchema(UserProfile, strict_json_schema=True)
+    else:
+        # Use json_object mode for limited models
+        output_type = JsonObjectOutputSchema(UserProfile)
+
+    return Agent(
+        name="UserProfileAgent",
+        instructions="你是一个专业的用户信息处理助手",
+        output_type=output_type,
+        model=model
+    )
+```
+
+#### JsonObjectOutputSchema
+
+Use `JsonObjectOutputSchema` when you know the model only supports `json_object` mode:
+
+```python
+from agents import Agent, JsonObjectOutputSchema
+
+# Explicitly uses json_object mode with automatic prompt injection
+agent = Agent(
+    name="JsonObjectAgent",
+    instructions="你是一个专业的用户信息处理助手",
+    output_type=JsonObjectOutputSchema(UserProfile)
+)
+```
+
+#### Key Features
+
+- **Explicit Control**: Business layer explicitly chooses the appropriate schema
+- **Automatic Prompt Injection**: Injects JSON schema instructions into system prompts for `json_object` mode
+- **User-Controlled Instructions**: Generates instructions based on user-defined schema language and descriptions
+- **Type Safety**: Maintains strict Pydantic validation with JSON repair capabilities
+- **Simplified Design**: No complex auto-detection, just clear business logic
+
+#### Custom Instructions
+
+The `custom_instructions` parameter allows you to provide additional instructions that will be appended after the JSON Schema. This is useful for adding examples, special formatting requirements, or domain-specific guidance.
+
+```python
+# Default behavior - uses standard JSON Schema + simple instruction
+schema = JsonObjectOutputSchema(UserProfile)
+# Generates: JSON Schema + "Always respond strictly in the following JSON format with no additional explanatory text."
+
+# Custom instructions with examples
+schema = JsonObjectOutputSchema(
+    UserProfile,
+    custom_instructions="""Return a JSON object with user profile information.
+
+Example:
+{
+  "name": "John Doe",
+  "age": 25,
+  "city": "Beijing",
+  "is_active": true,
+  "interests": ["reading", "coding"]
+}
+
+Output only valid JSON with no additional text or explanations."""
+)
+
+# Custom instructions for specific requirements
+schema = JsonObjectOutputSchema(
+    UserProfile,
+    custom_instructions="""Please ensure:
+1. All string values are properly escaped
+2. Age must be a positive integer
+3. City names should be in title case
+4. Interests array should contain at least one item
+
+Output only valid JSON."""
+)
+```
+
+The final instruction will be: `JSON Schema + "\n\n" + custom_instructions`
+
+#### JSON Repair Functionality
+
+The SDK includes powerful JSON repair capabilities to handle malformed LLM outputs:
+
+```python
+# JSON repair is enabled by default
+schema = JsonObjectOutputSchema(UserProfile)
+
+# Test with broken JSON
+broken_json = """{
+    name: "张三",        // Missing quotes
+    age: 25,
+    city: "北京",
+    is_active: true,
+    interests: ["编程", "阅读",],  // Trailing comma
+}"""
+
+# Automatically repairs and validates
+try:
+    result = schema.validate_json(broken_json)
+    print(f"Repaired successfully: {result}")
+except ModelBehaviorError as e:
+    print(f"Repair failed: {e}")
+
+# Disable repair if needed
+schema_no_repair = JsonObjectOutputSchema(
+    UserProfile,
+    enable_json_repair=False
+)
+```
+
+**Supported repair types:**
+- Missing quotes around property names
+- Trailing commas
+- Single quotes instead of double quotes
+- Incomplete JSON structures
+- Other common format errors
+
+**Performance:** The repair process is highly optimized and typically adds only 1-10ms overhead.
+
+#### Factory Methods
+
+```python
+# For different data types
+pydantic_schema = JsonObjectOutputSchema.for_pydantic_model(UserProfile)
+dataclass_schema = JsonObjectOutputSchema.for_dataclass(TaskItem)
+typed_dict_schema = JsonObjectOutputSchema.for_typed_dict(UserDict)
+```
+
+!!! tip "When to Use Each Approach"
+
+    - Use `JsonObjectOutputSchema` when you know the model only supports `json_object` mode
+    - Use `AgentOutputSchema` when you know the model supports `json_schema` mode
+    - Let your business layer choose the appropriate schema based on model capabilities for maximum flexibility
+
 ## Handoffs
 
 Handoffs are sub-agents that the agent can delegate to. You provide a list of handoffs, and the agent can choose to delegate to them if relevant. This is a powerful pattern that allows orchestrating modular, specialized agents that excel at a single task. Read more in the [handoffs](handoffs.md) documentation.
