@@ -595,12 +595,21 @@ class TestStreamingToolAdvanced:
             assert context_event.tool_name == "run_sub_agent"
             assert hasattr(context_event, 'internal_event')
 
-            # 内部事件应该是 RunItemStreamEvent 或 RawResponsesStreamEvent
-            from agents import RawResponsesStreamEvent, RunItemStreamEvent
+            # 内部事件应该是 RunItemStreamEvent、RawResponsesStreamEvent 或 AgentUpdatedStreamEvent
+            from agents import AgentUpdatedStreamEvent, RawResponsesStreamEvent, RunItemStreamEvent
+
+            # 验证类型限制：只有这三种类型的事件会被包装
+            allowed_types = (RunItemStreamEvent, RawResponsesStreamEvent, AgentUpdatedStreamEvent)
+            assert isinstance(context_event.internal_event, allowed_types), \
+                f"StreamingToolContextEvent 只应包装允许的事件类型，但收到了 {type(context_event.internal_event)}"
+
             if isinstance(context_event.internal_event, RunItemStreamEvent):
                 run_item_events.append(context_event)
             elif isinstance(context_event.internal_event, RawResponsesStreamEvent):
                 raw_response_events.append(context_event)
+            elif isinstance(context_event.internal_event, AgentUpdatedStreamEvent):
+                # AgentUpdatedStreamEvent 也应该被包装
+                pass
 
         # 验证两种类型的事件都被包装了
         assert len(run_item_events) > 0, "应该有被包装的 RunItemStreamEvent"

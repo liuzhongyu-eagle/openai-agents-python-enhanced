@@ -636,8 +636,16 @@ class RunImpl:
                                 event.tool_call_id = tool_call_id
 
                             # 实现上下文隔离：包装来自 streaming_tool 内部的事件
-                            # 包装 RunItemStreamEvent 和 RawResponsesStreamEvent，确保打字机效果展示
-                            if isinstance(event, (RunItemStreamEvent, RawResponsesStreamEvent)):
+                            # streaming_tool 支持 6 大类事件，需要包装会影响对话历史的事件
+                            from .stream_events import AgentUpdatedStreamEvent
+                            if isinstance(
+                                event,
+                                (
+                                    RunItemStreamEvent,
+                                    RawResponsesStreamEvent,
+                                    AgentUpdatedStreamEvent,
+                                ),
+                            ):
                                 # 将内部事件包装为容器事件，实现上下文隔离
                                 from .stream_events import StreamingToolContextEvent
                                 wrapped_event = StreamingToolContextEvent(
@@ -647,7 +655,8 @@ class RunImpl:
                                 )
                                 streamed_result._event_queue.put_nowait(wrapped_event)
                             else:
-                                # 其他事件（NotifyStreamEvent、StreamingToolStartEvent 等）直接传递
+                                # 其他事件直接传递：NotifyStreamEvent、StreamingToolStartEvent、StreamingToolEndEvent
+                                # 这确保了只有会影响对话历史的事件被包装，其他事件保持原样
                                 streamed_result._event_queue.put_nowait(event)
                         except StopAsyncIteration:
                             # According to the design, only `yield str` produces a final result.
