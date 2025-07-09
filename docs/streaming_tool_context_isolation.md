@@ -42,7 +42,7 @@ class StreamingToolContextEvent:
     tool_call_id: str
     """streaming_tool 调用的唯一标识符"""
     
-    internal_event: StreamEvent
+    internal_event: RunItemStreamEvent | RawResponsesStreamEvent | AgentUpdatedStreamEvent
     """被包装的内部事件，仅用于展示目的"""
     
     type: Literal["streaming_tool_context_event"] = "streaming_tool_context_event"
@@ -54,8 +54,9 @@ class StreamingToolContextEvent:
 
 1. **RunItemStreamEvent**：包含内部 agent 的 RunItem（MessageOutputItem、ReasoningItem 等）
 2. **RawResponsesStreamEvent**：包含内部 agent 的原始响应（打字机效果等）
+3. **AgentUpdatedStreamEvent**：包含内部 agent 切换事件
 
-其他事件类型（如 `NotifyStreamEvent`、`ToolStreamStartEvent`、`ToolStreamEndEvent`）会直接传递，不被包装。
+其他事件类型（如 `NotifyStreamEvent`、`StreamingToolStartEvent`、`StreamingToolEndEvent`）会直接传递，不被包装。
 
 ### 实现位置
 
@@ -63,7 +64,7 @@ class StreamingToolContextEvent:
 
 ```python
 # 实现上下文隔离：包装来自 streaming_tool 内部的事件
-if isinstance(event, (RunItemStreamEvent, RawResponsesStreamEvent)):
+if isinstance(event, (RunItemStreamEvent, RawResponsesStreamEvent, AgentUpdatedStreamEvent)):
     # 将内部事件包装为容器事件，实现上下文隔离
     wrapped_event = StreamingToolContextEvent(
         tool_name=tool_name,

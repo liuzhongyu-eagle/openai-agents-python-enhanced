@@ -8,7 +8,7 @@ Streaming Tool 上下文隔离演示
 4. 上下文隔离对对话历史的影响
 
 核心概念：
-- 内部 RunItemStreamEvent 和 RawResponsesStreamEvent 被自动包装
+- 内部 RunItemStreamEvent、RawResponsesStreamEvent 和 AgentUpdatedStreamEvent 被自动包装
 - 只有 tool_output 影响对话历史
 - 客户端仍能看到完整的内部进展
 """
