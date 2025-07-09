@@ -122,7 +122,7 @@ eventSource.onmessage = function(event) {
 2. **agent.as_tool(streaming=True)**：agent 被封装为 streaming_tool
 3. **嵌套调用**：streaming_tool 内部调用其他 streaming_tool
 
-在所有这些场景中，内部产生的 `RunItemStreamEvent` 和 `RawResponsesStreamEvent` 都会被自动包装，确保上下文隔离。
+在所有这些场景中，内部产生的 `RunItemStreamEvent` 、`AgentUpdatedStreamEvent` 和 `RawResponsesStreamEvent` 都会被自动包装，确保上下文隔离。
 
 ## 优势
 
