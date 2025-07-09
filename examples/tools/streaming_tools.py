@@ -256,7 +256,7 @@ async def traditional_file_analyzer(file_path: str) -> AsyncGenerator[StreamEven
 async def complex_workflow_tool(task_name: str) -> AsyncGenerator[StreamEvent | str, Any]:
     """复杂工作流工具 - 演示括号事件的重要性
 
-    enable_bracketing=True 会自动生成 ToolStreamStartEvent 和 ToolStreamEndEvent，
+    enable_bracketing=True 会自动生成 StreamingToolStartEvent 和 StreamingToolEndEvent，
     为客户端提供清晰的流程边界，特别适用于嵌套调用场景。
 
     Args:
@@ -285,7 +285,7 @@ async def complex_workflow_tool(task_name: str) -> AsyncGenerator[StreamEvent | 
 
     yield NotifyStreamEvent(data="✅ 所有步骤完成!", tag="success")
 
-    # 注意：ToolStreamEndEvent 会在这个 yield 之前自动发送
+    # 注意：StreamingToolEndEvent 会在这个 yield 之前自动发送
     yield f"工作流 '{task_name}' 执行完成！所有 {len(subtasks)} 个步骤已成功完成，耗时约 {len(subtasks) * 0.3:.1f} 秒。"
 
 
@@ -375,9 +375,9 @@ async def demo_core_scenarios():
                     print(f"  [{event_count:2d}] 🔄 {event.data}")
                 else:
                     print(f"  [{event_count:2d}] 📝 {event.data}")
-            elif event.type == "tool_stream_start_event":
+            elif event.type == "streaming_tool_start_event":
                 print(f"  [{event_count:2d}] 🚀 [开始] {event.tool_name}")
-            elif event.type == "tool_stream_end_event":
+            elif event.type == "streaming_tool_end_event":
                 print(f"  [{event_count:2d}] 🏁 [结束] {event.tool_name}")
 
         print(f"\n💡 最终结果: {result.final_output}")
@@ -410,11 +410,11 @@ async def demo_agent_as_tool():
         event_count += 1
         indent = "  " * indent_level
 
-        if event.type == "tool_stream_start_event":
+        if event.type == "streaming_tool_start_event":
             print(f"{indent}[{event_count:2d}] 🚀 开始调用: {event.tool_name}")
             if event.tool_name == "run_file_analysis":
                 indent_level += 1
-        elif event.type == "tool_stream_end_event":
+        elif event.type == "streaming_tool_end_event":
             if hasattr(event, 'tool_name') and event.tool_name == "run_file_analysis":
                 indent_level = max(0, indent_level - 1)
             print(f"{indent}[{event_count:2d}] 🏁 结束调用: {event.tool_name}")

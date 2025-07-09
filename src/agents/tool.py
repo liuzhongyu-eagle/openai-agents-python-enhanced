@@ -27,8 +27,8 @@ from .run_context import RunContextWrapper
 from .stream_events import (
     NotifyStreamEvent,
     StreamEvent,
-    ToolStreamEndEvent,
-    ToolStreamStartEvent,
+    StreamingToolEndEvent,
+    StreamingToolStartEvent,
 )
 from .tool_context import ToolContext
 from .tracing import SpanError
@@ -633,7 +633,7 @@ def streaming_tool(
                     # 添加关键字参数
                     combined_args.update(kwargs)
 
-                    yield ToolStreamStartEvent(
+                    yield StreamingToolStartEvent(
                         tool_name=schema.name,
                         tool_call_id=tool_call_id,
                         input_args=combined_args,
@@ -646,9 +646,9 @@ def streaming_tool(
 
                 async for event in generator:
                     if isinstance(event, str):
-                        # 根据设计文档，ToolStreamEndEvent 必须在最终的 yield str 之前发出
+                        # 根据设计文档，StreamingToolEndEvent 必须在最终的 yield str 之前发出
                         if enable_bracketing:
-                            yield ToolStreamEndEvent(
+                            yield StreamingToolEndEvent(
                                 tool_name=schema.name, tool_call_id=tool_call_id
                             )
                         yield event
@@ -661,12 +661,12 @@ def streaming_tool(
 
                 # 如果生成器正常结束但没有产生字符串结果，仍需发送结束事件
                 if enable_bracketing:
-                    yield ToolStreamEndEvent(tool_name=schema.name, tool_call_id=tool_call_id)
+                    yield StreamingToolEndEvent(tool_name=schema.name, tool_call_id=tool_call_id)
 
             except Exception:
                 # 异常情况下也要确保发送结束事件
                 if enable_bracketing:
-                    yield ToolStreamEndEvent(tool_name=schema.name, tool_call_id=tool_call_id)
+                    yield StreamingToolEndEvent(tool_name=schema.name, tool_call_id=tool_call_id)
                 raise
 
         return StreamingTool(

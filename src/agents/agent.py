@@ -224,7 +224,7 @@ class Agent(Generic[TContext]):
             custom_output_extractor: A function that extracts the output from the agent. If not
                 provided, the last message from the agent will be used.
             streaming: Whether to create a streaming tool that yields events during execution.
-            enable_bracketing: Whether to emit ToolStreamStartEvent and ToolStreamEndEvent for
+            enable_bracketing: Whether to emit StreamingToolStartEvent and StreamingToolEndEvent for
                 clear process orchestration. Only applies when streaming=True.
         """
 
@@ -266,6 +266,8 @@ class Agent(Generic[TContext]):
                     input=input,
                     context=context.context,
                 )
+
+                # 直接传递所有事件，上下文隔离在 streaming_tool 执行层面实现
                 async for event in result.stream_events():
                     yield event
 

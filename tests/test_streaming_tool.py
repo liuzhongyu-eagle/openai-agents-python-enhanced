@@ -18,8 +18,8 @@ from agents.run_context import RunContextWrapper
 from agents.stream_events import (
     NotifyStreamEvent,
     StreamEvent,
-    ToolStreamEndEvent,
-    ToolStreamStartEvent,
+    StreamingToolEndEvent,
+    StreamingToolStartEvent,
 )
 
 from .fake_model import FakeModel
@@ -140,8 +140,8 @@ class TestStreamingToolDecorator:
         # 应该有开始事件、通知事件、结束事件、最终结果
         assert len(events) == 4
 
-        # 第一个事件应该是 ToolStreamStartEvent
-        assert isinstance(events[0], ToolStreamStartEvent)
+        # 第一个事件应该是 StreamingToolStartEvent
+        assert isinstance(events[0], StreamingToolStartEvent)
         assert events[0].tool_name == "bracketed_tool"
         assert events[0].tool_call_id == "bracket_test"
         assert events[0].input_args == {"data": "测试数据"}
@@ -150,8 +150,8 @@ class TestStreamingToolDecorator:
         assert isinstance(events[1], NotifyStreamEvent)
         assert events[1].data == "处理 测试数据"
 
-        # 第三个事件应该是 ToolStreamEndEvent
-        assert isinstance(events[2], ToolStreamEndEvent)
+        # 第三个事件应该是 StreamingToolEndEvent
+        assert isinstance(events[2], StreamingToolEndEvent)
         assert events[2].tool_name == "bracketed_tool"
         assert events[2].tool_call_id == "bracket_test"
 
@@ -178,9 +178,9 @@ class TestStreamingToolDecorator:
             events.append(event)
 
         assert len(events) == 4  # Start, Notify, End, Result
-        assert isinstance(events[0], ToolStreamStartEvent)
+        assert isinstance(events[0], StreamingToolStartEvent)
         assert isinstance(events[1], NotifyStreamEvent)
-        assert isinstance(events[2], ToolStreamEndEvent)
+        assert isinstance(events[2], StreamingToolEndEvent)
         assert isinstance(events[3], str)
 
         # 测试错误情况
@@ -193,7 +193,7 @@ class TestStreamingToolDecorator:
 
         # 即使出错，也应该收到开始事件和通知事件
         assert len(events) >= 2
-        assert isinstance(events[0], ToolStreamStartEvent)
+        assert isinstance(events[0], StreamingToolStartEvent)
         assert isinstance(events[1], NotifyStreamEvent)
 
 
@@ -227,10 +227,10 @@ class TestStreamingToolEvents:
         assert event_full.tool_call_id == "call_123"
 
     def test_tool_stream_start_event_creation(self):
-        """测试 ToolStreamStartEvent 的创建和属性"""
+        """测试 StreamingToolStartEvent 的创建和属性"""
 
         input_args = {"param1": "value1", "param2": 42}
-        event = ToolStreamStartEvent(
+        event = StreamingToolStartEvent(
             tool_name="test_tool",
             tool_call_id="call_456",
             input_args=input_args
@@ -239,19 +239,19 @@ class TestStreamingToolEvents:
         assert event.tool_name == "test_tool"
         assert event.tool_call_id == "call_456"
         assert event.input_args == input_args
-        assert event.type == "tool_stream_start_event"
+        assert event.type == "streaming_tool_start_event"
 
     def test_tool_stream_end_event_creation(self):
-        """测试 ToolStreamEndEvent 的创建和属性"""
+        """测试 StreamingToolEndEvent 的创建和属性"""
 
-        event = ToolStreamEndEvent(
+        event = StreamingToolEndEvent(
             tool_name="test_tool",
             tool_call_id="call_789"
         )
 
         assert event.tool_name == "test_tool"
         assert event.tool_call_id == "call_789"
-        assert event.type == "tool_stream_end_event"
+        assert event.type == "streaming_tool_end_event"
 
 
 class TestStreamingToolIntegration:
@@ -295,9 +295,9 @@ class TestStreamingToolIntegration:
         async for event in result.stream_events():
             if isinstance(event, NotifyStreamEvent):
                 notify_events.append(event)
-            elif isinstance(event, ToolStreamStartEvent):
+            elif isinstance(event, StreamingToolStartEvent):
                 tool_start_events.append(event)
-            elif isinstance(event, ToolStreamEndEvent):
+            elif isinstance(event, StreamingToolEndEvent):
                 tool_end_events.append(event)
 
         # 验证收到了预期的通知事件
@@ -523,6 +523,120 @@ class TestStreamingToolAdvanced:
         # 应该收到来自子工具的通知事件
         assert len(notify_events) >= 1
         assert any("子工具开始处理" in event.data for event in notify_events)
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_context_isolation(self):
+        """测试 streaming_tool 的上下文隔离功能
+
+        验证 streaming_tool 内部 agent 的 RunItem 被包装为 StreamingToolContextEvent，
+        不会直接影响主 agent 的对话历史，实现上下文隔离。
+        """
+        from agents import StreamingToolContextEvent
+
+        # 创建一个子 Agent，会产生多种类型的 RunItem
+        @streaming_tool
+        async def complex_sub_tool(task: str) -> AsyncGenerator[StreamEvent | str, Any]:
+            yield NotifyStreamEvent(data=f"子工具开始处理: {task}")
+            yield f"子工具完成: {task}"
+
+        sub_model = FakeModel()
+        sub_model.set_next_output([
+            get_function_tool_call("complex_sub_tool", json.dumps({"task": "复杂任务"})),
+            get_text_message("子Agent的消息输出"),  # 这会产生 MessageOutputItem
+            get_text_message("子Agent完成")
+        ])
+
+        sub_agent = Agent(
+            name="子代理",
+            model=sub_model,
+            tools=[complex_sub_tool]
+        )
+
+        # 创建主 Agent
+        main_model = FakeModel()
+        main_model.set_next_output([
+            get_function_tool_call("run_sub_agent", json.dumps({"input": "执行复杂任务"})),
+            get_text_message("主Agent完成")  # 这会产生 MessageOutputItem
+        ])
+
+        main_agent = Agent(
+            name="主代理",
+            model=main_model,
+            tools=[
+                sub_agent.as_tool(
+                    tool_name="run_sub_agent",
+                    tool_description="运行子代理",
+                    streaming=True
+                )
+            ]
+        )
+
+        # 运行主 Agent（使用 streaming 模式）
+        result = Runner.run_streamed(main_agent, input="请运行子代理")
+
+        # 收集事件并验证上下文隔离
+        context_events = []
+        notify_events = []
+
+        async for event in result.stream_events():
+            if isinstance(event, StreamingToolContextEvent):
+                context_events.append(event)
+            elif isinstance(event, NotifyStreamEvent):
+                notify_events.append(event)
+
+        # 验证事件隔离：内部事件被包装为 StreamingToolContextEvent
+        assert len(context_events) > 0, "应该有 StreamingToolContextEvent 事件"
+
+        # 验证包装事件的结构
+        run_item_events = []
+        raw_response_events = []
+
+        for context_event in context_events:
+            assert context_event.tool_name == "run_sub_agent"
+            assert hasattr(context_event, 'internal_event')
+
+            # 内部事件应该是 RunItemStreamEvent 或 RawResponsesStreamEvent
+            from agents import RawResponsesStreamEvent, RunItemStreamEvent
+            if isinstance(context_event.internal_event, RunItemStreamEvent):
+                run_item_events.append(context_event)
+            elif isinstance(context_event.internal_event, RawResponsesStreamEvent):
+                raw_response_events.append(context_event)
+
+        # 验证两种类型的事件都被包装了
+        assert len(run_item_events) > 0, "应该有被包装的 RunItemStreamEvent"
+        assert len(raw_response_events) > 0, "应该有被包装的 RawResponsesStreamEvent（打字机效果）"
+
+        # 验证 NotifyStreamEvent 仍然直接传递
+        assert len(notify_events) > 0, "应该有直接的 NotifyStreamEvent"
+        assert any("子工具开始处理" in event.data for event in notify_events)
+
+        # 验证 to_input_list 的上下文隔离：
+        # 由于内部 RunItem 被包装，不会直接影响主 agent 的对话历史
+        input_list = result.to_input_list()
+
+        # 统计不同类型的输入项
+        user_messages = [item for item in input_list if item.get("role") == "user"]
+        assistant_messages = [item for item in input_list if item.get("role") == "assistant"]
+        tool_calls = [item for item in input_list if item.get("type") == "function_call"]
+        tool_outputs = [item for item in input_list if item.get("type") == "function_call_output"]
+
+        # 验证上下文隔离：应该只有主 agent 的消息和工具输出
+        assert len(user_messages) == 1  # 原始用户输入
+        assert len(assistant_messages) == 1  # 只有主 agent 的消息
+        assert len(tool_calls) == 1  # 主 agent 调用 run_sub_agent
+        assert len(tool_outputs) == 1  # run_sub_agent 的输出
+
+        # 验证助手消息内容是主 agent 的
+        content = assistant_messages[0].get("content")
+        if isinstance(content, list) and len(content) > 0:
+            first_content = content[0]
+            if isinstance(first_content, dict) and "text" in first_content:
+                assert first_content["text"] == "主Agent完成"
+
+        # 验证工具输出包含子 agent 的结果
+        output = tool_outputs[0].get("output", "")
+        if isinstance(output, str):
+            assert "子Agent" in output
 
     @pytest.mark.asyncio
     async def test_streaming_tool_error_handling(self):

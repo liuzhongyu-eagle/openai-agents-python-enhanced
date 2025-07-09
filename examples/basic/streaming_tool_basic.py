@@ -6,8 +6,12 @@
 2. 过程通知 vs 最终结果的区别
 3. 在Agent中使用流式工具
 4. 监听和处理流式事件
+5. 上下文隔离机制和 StreamingToolContextEvent
 
-核心理念：yield NotifyStreamEvent(...) 用于过程展示，yield "字符串" 用于最终结果
+核心理念：
+- yield NotifyStreamEvent(...) 用于过程展示
+- yield "字符串" 用于最终结果
+- 内部 agent 事件被自动包装为 StreamingToolContextEvent，实现上下文隔离
 """
 import asyncio
 from collections.abc import AsyncGenerator
@@ -254,6 +258,51 @@ async def demo_direct_calls():
     print(f"\n📊 直接调用事件数: {event_count}")
 
 
+async def demo_context_isolation():
+    """演示上下文隔离机制"""
+    print("\n" + "=" * 70)
+    print("上下文隔离机制演示")
+    print("说明：streaming_tool 内部事件被自动包装，不影响主对话历史")
+    print("=" * 70)
+
+    print("\n📋 上下文隔离的关键概念:")
+    print("  1. 内部 RunItemStreamEvent 被包装为 StreamingToolContextEvent")
+    print("  2. 内部 RawResponsesStreamEvent 也被包装（保持打字机效果）")
+    print("  3. NotifyStreamEvent 等展示性事件直接传递")
+    print("  4. 只有 tool_output 影响对话历史")
+
+    print("\n🔍 客户端事件处理示例:")
+    print("""
+    // JavaScript 客户端处理示例
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        switch(data.event_type) {
+            case 'streaming_tool_context_event':
+                // 展示内部进展，但知道这不影响对话
+                showInternalProgress(data.internal_event);
+                break;
+
+            case 'run_item_stream_event':
+                // 真实的对话事件
+                updateConversation(data.item);
+                break;
+
+            case 'notify_stream_event':
+                // 通知事件
+                showNotification(data.data);
+                break;
+        }
+    };
+    """)
+
+    print("\n✅ 上下文隔离的优势:")
+    print("  • 客户端能看到完整的内部进展")
+    print("  • 内部事件不会污染主对话历史")
+    print("  • 支持多层嵌套的 streaming_tool")
+    print("  • 保持打字机效果等实时反馈")
+
+
 async def demo_key_concepts():
     """演示关键概念总结"""
     print("\n" + "=" * 70)
@@ -265,7 +314,8 @@ async def demo_key_concepts():
         ("最终结果", "yield '字符串结果'", "影响对话历史，必须是最后一个yield"),
         ("事件标签", "NotifyStreamEvent(tag='success')", "用于前端UI逻辑和事件分类"),
         ("增量输出", "NotifyStreamEvent(is_delta=True)", "用于打字机效果等流式文本"),
-        ("终结信号", "yield '字符串' 后停止", "Runner会忽略后续的yield")
+        ("终结信号", "yield '字符串' 后停止", "Runner会忽略后续的yield"),
+        ("上下文隔离", "StreamingToolContextEvent", "包装内部事件，实现隔离")
     ]
 
     print(f"{'概念':<12} {'代码示例':<35} {'说明'}")
@@ -277,6 +327,7 @@ async def demo_key_concepts():
     print("  1. 严格分离'过程展示'与'最终结果'")
     print("  2. NotifyStreamEvent = 过程，字符串 = 结果")
     print("  3. 最后的yield必须是字符串")
+    print("  4. 内部事件自动包装，实现上下文隔离")
 
 
 if __name__ == "__main__":
@@ -284,11 +335,13 @@ if __name__ == "__main__":
     async def main():
         await demo_basic_concepts()
         await demo_direct_calls()
+        await demo_context_isolation()
         await demo_key_concepts()
 
         print("\n" + "=" * 70)
         print("🎉 基础演示完成！")
         print("📚 进阶内容请参考: examples/tools/streaming_tools.py")
+        print("📖 完整文档请参考: docs/streaming_tool_context_isolation.md")
         print("📖 完整文档请参考: docs/tools.md")
         print("=" * 70)
 
