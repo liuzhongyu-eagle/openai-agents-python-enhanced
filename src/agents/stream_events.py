@@ -120,12 +120,12 @@ class StreamingToolContextEvent:
     streaming_tool 支持的事件类型：
     1. RunItemStreamEvent - 对话项事件（需要包装）
     2. RawResponsesStreamEvent - 原始响应事件（需要包装）
-    3. NotifyStreamEvent - 通知事件（直接传递）
-    4. StreamingToolStartEvent - 工具开始事件（直接传递）
-    5. StreamingToolEndEvent - 工具结束事件（直接传递）
-    6. AgentUpdatedStreamEvent - 代理更新事件（直接传递）
+    3. AgentUpdatedStreamEvent - 代理更新事件（直接包装）
+    4. NotifyStreamEvent - 通知事件（直接传递）
+    5. StreamingToolStartEvent - 工具开始事件（直接传递）
+    6. StreamingToolEndEvent - 工具结束事件（直接传递）
 
-    只有 RunItemStreamEvent 和 RawResponsesStreamEvent 会被包装，
+    只有 RunItemStreamEvent、RawResponsesStreamEvent 和 AgentUpdatedStreamEvent 会被包装，
     其他事件类型直接传递，确保上下文隔离的同时保持完整的事件流。
     """
     tool_name: str
@@ -135,7 +135,7 @@ class StreamingToolContextEvent:
     """streaming_tool 调用的唯一标识符"""
 
     internal_event: RunItemStreamEvent | RawResponsesStreamEvent | AgentUpdatedStreamEvent
-    """被包装的内部事件，仅限于 RunItemStreamEvent、RawResponsesStreamEvent 和 AgentUpdatedStreamEvent"""
+    """被包装的内部事件，仅限于三种会影响对话历史的事件类型"""
 
     type: Literal["streaming_tool_context_event"] = "streaming_tool_context_event"
 
