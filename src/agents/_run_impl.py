@@ -69,10 +69,11 @@ from .models.interface import ModelTracing
 from .run_context import RunContextWrapper, TContext
 from .stream_events import (
     NotifyStreamEvent,
+    RawResponsesStreamEvent,
     RunItemStreamEvent,
     StreamEvent,
-    ToolStreamEndEvent,
-    ToolStreamStartEvent,
+    StreamingToolEndEvent,
+    StreamingToolStartEvent,
 )
 from .tool import (
     ComputerTool,
@@ -627,11 +628,27 @@ class RunImpl:
                             if isinstance(event, str):
                                 final_output = event
                                 break
+                            # 为特定事件注入 tool_call_id
                             if isinstance(
-                                event, (ToolStreamStartEvent, ToolStreamEndEvent, NotifyStreamEvent)
+                                event,
+                                (StreamingToolStartEvent, StreamingToolEndEvent, NotifyStreamEvent),
                             ) and event.tool_call_id is None:
                                 event.tool_call_id = tool_call_id
-                            streamed_result._event_queue.put_nowait(event)
+
+                            # 实现上下文隔离：包装来自 streaming_tool 内部的事件
+                            # 包装 RunItemStreamEvent 和 RawResponsesStreamEvent，确保打字机效果展示
+                            if isinstance(event, (RunItemStreamEvent, RawResponsesStreamEvent)):
+                                # 将内部事件包装为容器事件，实现上下文隔离
+                                from .stream_events import StreamingToolContextEvent
+                                wrapped_event = StreamingToolContextEvent(
+                                    tool_name=tool_name,
+                                    tool_call_id=tool_call_id,
+                                    internal_event=event
+                                )
+                                streamed_result._event_queue.put_nowait(wrapped_event)
+                            else:
+                                # 其他事件（NotifyStreamEvent、StreamingToolStartEvent 等）直接传递
+                                streamed_result._event_queue.put_nowait(event)
                         except StopAsyncIteration:
                             # According to the design, only `yield str` produces a final result.
                             # StopAsyncIteration just signals the end of the stream.

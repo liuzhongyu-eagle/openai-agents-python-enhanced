@@ -72,11 +72,11 @@ class NotifyStreamEvent:
 
 
 @dataclass
-class ToolStreamStartEvent:
-    """Event that notifies that a tool stream is starting."""
+class StreamingToolStartEvent:
+    """Event that notifies that a streaming tool is starting."""
 
     tool_name: str
-    """The name of the tool that is starting."""
+    """The name of the streaming tool that is starting."""
 
     tool_call_id: str
     """The ID of the tool call that is starting."""
@@ -84,20 +84,20 @@ class ToolStreamStartEvent:
     input_args: dict[str, Any]
     """The input arguments to the tool."""
 
-    type: Literal["tool_stream_start_event"] = "tool_stream_start_event"
+    type: Literal["streaming_tool_start_event"] = "streaming_tool_start_event"
 
 
 @dataclass
-class ToolStreamEndEvent:
-    """Event that notifies that a tool stream is ending."""
+class StreamingToolEndEvent:
+    """Event that notifies that a streaming tool is ending."""
 
     tool_name: str
-    """The name of the tool that is ending."""
+    """The name of the streaming tool that is ending."""
 
     tool_call_id: str
     """The ID of the tool call that is ending."""
 
-    type: Literal["tool_stream_end_event"] = "tool_stream_end_event"
+    type: Literal["streaming_tool_end_event"] = "streaming_tool_end_event"
 
 
 @dataclass
@@ -110,12 +110,32 @@ class AgentUpdatedStreamEvent:
     type: Literal["agent_updated_stream_event"] = "agent_updated_stream_event"
 
 
+@dataclass
+class StreamingToolContextEvent:
+    """streaming_tool 内部上下文事件容器
+
+    用于包装 streaming_tool 内部产生的事件，这些事件仅用于展示，
+    不会影响主 agent 的对话历史。实现上下文隔离的关键机制。
+    """
+    tool_name: str
+    """生成此事件的 streaming_tool 名称"""
+
+    tool_call_id: str
+    """streaming_tool 调用的唯一标识符"""
+
+    internal_event: StreamEvent
+    """被包装的内部事件，仅用于展示目的"""
+
+    type: Literal["streaming_tool_context_event"] = "streaming_tool_context_event"
+
+
 StreamEvent: TypeAlias = Union[
     RawResponsesStreamEvent,
     RunItemStreamEvent,
     AgentUpdatedStreamEvent,
     NotifyStreamEvent,
-    ToolStreamStartEvent,
-    ToolStreamEndEvent,
+    StreamingToolStartEvent,
+    StreamingToolEndEvent,
+    StreamingToolContextEvent,
 ]
 """A streaming event from an agent."""
