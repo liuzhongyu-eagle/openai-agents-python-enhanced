@@ -16,8 +16,12 @@ from agents import Agent, Runner, function_tool, streaming_tool
 from agents.exceptions import ModelBehaviorError
 from agents.run_context import RunContextWrapper
 from agents.stream_events import (
+    AgentUpdatedStreamEvent,
     NotifyStreamEvent,
+    RawResponsesStreamEvent,
+    RunItemStreamEvent,
     StreamEvent,
+    StreamingToolContextEvent,
     StreamingToolEndEvent,
     StreamingToolStartEvent,
 )
@@ -531,7 +535,6 @@ class TestStreamingToolAdvanced:
         验证 streaming_tool 内部 agent 的 RunItem 被包装为 StreamingToolContextEvent，
         不会直接影响主 agent 的对话历史，实现上下文隔离。
         """
-        from agents import StreamingToolContextEvent
 
         # 创建一个子 Agent，会产生多种类型的 RunItem
         @streaming_tool
@@ -596,8 +599,6 @@ class TestStreamingToolAdvanced:
             assert hasattr(context_event, 'internal_event')
 
             # 内部事件应该是 RunItemStreamEvent、RawResponsesStreamEvent 或 AgentUpdatedStreamEvent
-            from agents import AgentUpdatedStreamEvent, RawResponsesStreamEvent, RunItemStreamEvent
-
             # 验证类型限制：只有这三种类型的事件会被包装
             allowed_types = (RunItemStreamEvent, RawResponsesStreamEvent, AgentUpdatedStreamEvent)
             assert isinstance(context_event.internal_event, allowed_types), \
