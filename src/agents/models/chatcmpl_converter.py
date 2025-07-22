@@ -74,7 +74,15 @@ class Converter:
         if not final_output_schema or final_output_schema.is_plain_text():
             return NOT_GIVEN
 
-        # 使用 json_schema 模式
+        # 检查是否是 JsonObjectOutputSchema，如果是则使用 json_object 模式
+        # 这是为了兼容只支持 json_object 格式的 LLM 提供商（如 DeepSeek）
+        from ..json_object_output import JsonObjectOutputSchema
+        if isinstance(final_output_schema, JsonObjectOutputSchema):
+            return {
+                "type": "json_object"
+            }
+
+        # 其他情况使用 json_schema 模式
         return {
             "type": "json_schema",
             "json_schema": {
