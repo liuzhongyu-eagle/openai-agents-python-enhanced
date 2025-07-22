@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-07-22
+
+### Fixed
+- **JsonObjectOutputSchema 兼容性问题**：修复了 `JsonObjectOutputSchema` 在 DeepSeek API 中出现的 `response_format type is unavailable` 错误
+  - 修改 `convert_response_format` 方法，为 `JsonObjectOutputSchema` 添加特殊处理
+  - `JsonObjectOutputSchema` 现在使用 `{'type': 'json_object'}` 格式而不是 `json_schema` 格式
+  - 保持了其他输出模式（`AgentOutputSchema`）的向后兼容性
+  - 添加了单元测试验证修复效果和回归测试
+
 ## [0.2.0] - 2025-01-09
 
 ### Added
