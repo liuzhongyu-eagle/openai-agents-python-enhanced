@@ -41,6 +41,7 @@ from openai.types.responses.response_input_item_param import FunctionCallOutput
 from agents.agent_output import AgentOutputSchema
 from agents.exceptions import UserError
 from agents.items import TResponseInputItem
+from agents.json_object_output import JsonObjectOutputSchema
 from agents.models.chatcmpl_converter import Converter
 from agents.models.fake_id import FAKE_RESPONSES_ID
 
@@ -441,4 +442,35 @@ def test_items_to_messages_ignores_reasoning_item() -> None:
     }
     messages = Converter.items_to_messages([reasoning_item])
     assert len(messages) == 0
+
+
+def test_convert_response_format_json_object_schema() -> None:
+    """
+    测试 JsonObjectOutputSchema 应该返回 json_object 格式而不是 json_schema 格式。
+    这是为了兼容只支持 json_object 格式的 LLM 提供商（如 DeepSeek）。
+    """
+    # 创建 JsonObjectOutputSchema 实例
+    schema = JsonObjectOutputSchema(dict)
+    result = Converter.convert_response_format(schema)
+
+    # 验证返回的是 json_object 格式
+    assert isinstance(result, dict)
+    assert result == {"type": "json_object"}
+
+
+def test_convert_response_format_json_schema_still_works() -> None:
+    """
+    回归测试：确保 AgentOutputSchema 仍然使用 json_schema 格式。
+    """
+    # 创建 AgentOutputSchema 实例，使用 int 类型避免严格模式问题
+    schema = AgentOutputSchema(int)
+    result = Converter.convert_response_format(schema)
+
+    # 验证返回的是 json_schema 格式
+    assert isinstance(result, dict)
+    assert result["type"] == "json_schema"
+    assert "json_schema" in result
+    assert result["json_schema"]["name"] == "final_output"
+    assert "strict" in result["json_schema"]
+    assert "schema" in result["json_schema"]
 
