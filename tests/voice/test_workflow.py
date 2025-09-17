@@ -86,6 +86,7 @@ class FakeStreamingModel(Model):
                     output_index=0,
                     item_id=item.id,
                     sequence_number=0,
+                    logprobs=[],  # 添加必需的 logprobs 字段
                 )
 
         yield ResponseCompletedEvent(
