@@ -18,6 +18,7 @@ from agents.util._json_repair import repair_and_validate_json
 # 测试用的数据模型
 class UserProfile(BaseModel):
     """用户个人资料信息"""
+
     name: str = Field(description="用户的姓名")
     age: int = Field(description="用户的年龄", ge=0, le=150)
     city: str = Field(description="用户居住的城市")
@@ -30,13 +31,16 @@ class TestJsonRepairCore:
 
     def test_valid_json_no_repair_needed(self):
         """测试有效 JSON 无需修复"""
-        valid_json = json.dumps({
-            "name": "张三",
-            "age": 25,
-            "city": "北京",
-            "is_active": True,
-            "interests": ["编程", "阅读"]
-        }, ensure_ascii=False)
+        valid_json = json.dumps(
+            {
+                "name": "张三",
+                "age": 25,
+                "city": "北京",
+                "is_active": True,
+                "interests": ["编程", "阅读"],
+            },
+            ensure_ascii=False,
+        )
 
         result = repair_and_validate_json(valid_json)
 
@@ -284,12 +288,12 @@ class TestAgentIntegration:
         agent = Agent(
             name="TestAgent",
             instructions="测试代理",
-            output_type=JsonObjectOutputSchema(UserProfile)
+            output_type=JsonObjectOutputSchema(UserProfile),
         )
 
         # 验证输出类型支持修复
-        assert hasattr(agent.output_type, 'validate_json')
-        assert hasattr(agent.output_type, '_enable_json_repair')
+        assert hasattr(agent.output_type, "validate_json")
+        assert hasattr(agent.output_type, "_enable_json_repair")
         output_type = agent.output_type
         assert isinstance(output_type, JsonObjectOutputSchema)
         assert output_type._enable_json_repair is True
@@ -299,7 +303,7 @@ class TestAgentIntegration:
         agent = Agent(
             name="TestAgent",
             instructions="测试代理",
-            output_type=JsonObjectOutputSchema(UserProfile, enable_json_repair=False)
+            output_type=JsonObjectOutputSchema(UserProfile, enable_json_repair=False),
         )
 
         output_type = agent.output_type
@@ -339,18 +343,13 @@ class TestPerformance:
         # 创建一个较大的 JSON 对象
         large_data = {
             "users": [
-                {
-                    "name": f"用户{i}",
-                    "age": 20 + (i % 50),
-                    "city": "北京",
-                    "is_active": i % 2 == 0
-                }
+                {"name": f"用户{i}", "age": 20 + (i % 50), "city": "北京", "is_active": i % 2 == 0}
                 for i in range(100)
             ]
         }
 
         # 故意破坏 JSON 格式
-        broken_json = json.dumps(large_data, ensure_ascii=False).replace('"name"', 'name')
+        broken_json = json.dumps(large_data, ensure_ascii=False).replace('"name"', "name")
 
         result = repair_and_validate_json(broken_json)
 

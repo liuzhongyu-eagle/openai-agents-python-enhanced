@@ -81,7 +81,7 @@ class AgentOutputSchema(AgentOutputSchemaBase):
         self,
         output_type: type[Any],
         strict_json_schema: bool = True,
-        enable_json_repair: bool = True
+        enable_json_repair: bool = True,
     ):
         """
         Args:
@@ -135,8 +135,6 @@ class AgentOutputSchema(AgentOutputSchemaBase):
         """Whether the JSON schema is in strict mode."""
         return self._strict_json_schema
 
-
-
     def json_schema(self) -> dict[str, Any]:
         """The JSON schema of the output type."""
         if self.is_plain_text():
@@ -157,10 +155,7 @@ class AgentOutputSchema(AgentOutputSchemaBase):
 
         # 使用带修复功能的验证
         validated = validate_json_with_repair(
-            json_str,
-            self._type_adapter,
-            enable_repair=repair_enabled,
-            partial=False
+            json_str, self._type_adapter, enable_repair=repair_enabled, partial=False
         )
         if self._is_wrapped:
             if not isinstance(validated, dict):

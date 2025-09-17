@@ -11,6 +11,7 @@
 - 过程展示：yield NotifyStreamEvent(...) - 不影响对话历史
 - 最终结果：yield "字符串结果" - 作为最后一个yield，影响对话历史
 """
+
 import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any, Union
@@ -22,8 +23,11 @@ from agents import Agent, NotifyStreamEvent, Runner, StreamEvent, streaming_tool
 # 核心模式：yield NotifyStreamEvent(...) 用于过程展示
 # ============================================================================
 
+
 @streaming_tool
-async def data_pipeline_tool(source_url: str, batch_size: int = 100) -> AsyncGenerator[StreamEvent | str, Any]:
+async def data_pipeline_tool(
+    source_url: str, batch_size: int = 100
+) -> AsyncGenerator[StreamEvent | str, Any]:
     """数据管道处理工具 - 演示多阶段进度更新
 
     这个工具展示了如何在长时间运行的任务中提供详细的进度反馈。
@@ -48,8 +52,7 @@ async def data_pipeline_tool(source_url: str, batch_size: int = 100) -> AsyncGen
     while processed < total_records:
         batch_end = min(processed + batch_size, total_records)
         yield NotifyStreamEvent(
-            data=f"[3/4] 处理记录 {processed + 1}-{batch_end}/{total_records}",
-            tag="progress"
+            data=f"[3/4] 处理记录 {processed + 1}-{batch_end}/{total_records}", tag="progress"
         )
         processed = batch_end
         await asyncio.sleep(0.1)
@@ -68,6 +71,7 @@ async def data_pipeline_tool(source_url: str, batch_size: int = 100) -> AsyncGen
 # 场景二：RAG打字机效果（增量输出）
 # 核心模式：is_delta=True 用于流式文本输出
 # ============================================================================
+
 
 @streaming_tool
 async def research_and_summarize_tool(topic: str) -> AsyncGenerator[StreamEvent | str, Any]:
@@ -107,7 +111,7 @@ async def research_and_summarize_tool(topic: str) -> AsyncGenerator[StreamEvent 
         "3. 应用场景：\n",
         "在多个行业中都有成功案例，",
         "特别是在数据处理和自动化领域。\n\n",
-        "总结完成。"
+        "总结完成。",
     ]
 
     full_summary = ""
@@ -124,7 +128,9 @@ async def research_and_summarize_tool(topic: str) -> AsyncGenerator[StreamEvent 
 
 
 @streaming_tool
-async def simple_typewriter_tool(text: str, speed: float = 0.05) -> AsyncGenerator[StreamEvent | str, Any]:
+async def simple_typewriter_tool(
+    text: str, speed: float = 0.05
+) -> AsyncGenerator[StreamEvent | str, Any]:
     """简单打字机工具 - 基础的字符级增量输出
 
     Args:
@@ -149,6 +155,7 @@ async def simple_typewriter_tool(text: str, speed: float = 0.05) -> AsyncGenerat
 # 核心模式：Agent.as_tool(streaming=True) 实现无缝嵌套
 # ============================================================================
 
+
 # 首先定义一个专门的文件分析子Agent
 def create_file_analysis_agent():
     """创建专门的文件分析Agent"""
@@ -159,9 +166,7 @@ def create_file_analysis_agent():
         yield NotifyStreamEvent(data=f"🔍 开始{content_type}分析...")
         await asyncio.sleep(0.3)
 
-        analysis_steps = [
-            "词汇统计", "语法检查", "关键词提取", "情感分析"
-        ]
+        analysis_steps = ["词汇统计", "语法检查", "关键词提取", "情感分析"]
 
         for i, step in enumerate(analysis_steps, 1):
             yield NotifyStreamEvent(data=f"[{i}/{len(analysis_steps)}] {step}中...", tag="progress")
@@ -172,7 +177,7 @@ def create_file_analysis_agent():
     return Agent(
         name="FileAnalysisAgent",
         instructions="你是一个专业的文件分析专家。使用analyze_content_tool来分析不同类型的内容。",
-        tools=[analyze_content_tool]
+        tools=[analyze_content_tool],
     )
 
 
@@ -194,9 +199,9 @@ def create_orchestrator_agent():
                 tool_name="run_file_analysis",
                 tool_description="运行专门的文件分析Agent",
                 streaming=True,  # 关键：启用流式输出
-                enable_bracketing=True  # 推荐：提供清晰的嵌套层次
+                enable_bracketing=True,  # 推荐：提供清晰的嵌套层次
             )
-        ]
+        ],
     )
 
 
@@ -219,7 +224,7 @@ async def traditional_file_analyzer(file_path: str) -> AsyncGenerator[StreamEven
         ("🔍 词汇分析", "analyzing"),
         ("📊 统计计算", "calculating"),
         ("🎯 关键词提取", "extracting"),
-        ("📈 生成报告", "reporting")
+        ("📈 生成报告", "reporting"),
     ]
 
     results: dict[str, Union[int, float, list[str]]] = {}
@@ -238,19 +243,20 @@ async def traditional_file_analyzer(file_path: str) -> AsyncGenerator[StreamEven
     yield NotifyStreamEvent(data="✅ 分析完成!", tag="success")
 
     # 返回分析结果
-    keywords = results['keywords']
+    keywords = results["keywords"]
     assert isinstance(keywords, list), "keywords should be a list"
     yield f"""文件分析完成: {file_path}
 📊 统计结果:
-- 词汇数量: {results['word_count']}
-- 平均句长: {results['avg_sentence_length']}
-- 关键词: {', '.join(keywords)}"""
+- 词汇数量: {results["word_count"]}
+- 平均句长: {results["avg_sentence_length"]}
+- 关键词: {", ".join(keywords)}"""
 
 
 # ============================================================================
 # 场景四：括号事件演示 - 清晰的流程边界
 # 核心模式：enable_bracketing=True 提供嵌套上下文
 # ============================================================================
+
 
 @streaming_tool(enable_bracketing=True)
 async def complex_workflow_tool(task_name: str) -> AsyncGenerator[StreamEvent | str, Any]:
@@ -268,18 +274,14 @@ async def complex_workflow_tool(task_name: str) -> AsyncGenerator[StreamEvent | 
     subtasks = ["环境初始化", "数据收集", "核心处理", "结果验证", "清理工作"]
 
     for i, subtask in enumerate(subtasks, 1):
-        yield NotifyStreamEvent(
-            data=f"[{i}/{len(subtasks)}] {subtask}中...",
-            tag="workflow"
-        )
+        yield NotifyStreamEvent(data=f"[{i}/{len(subtasks)}] {subtask}中...", tag="workflow")
         await asyncio.sleep(0.3)
 
         if subtask == "核心处理":
             # 在核心处理步骤中添加更详细的进度
             for j in range(1, 4):
                 yield NotifyStreamEvent(
-                    data=f"  └─ 处理阶段 {j}/3: 正在优化算法参数",
-                    tag="subprocess"
+                    data=f"  └─ 处理阶段 {j}/3: 正在优化算法参数", tag="subprocess"
                 )
                 await asyncio.sleep(0.2)
 
@@ -292,6 +294,7 @@ async def complex_workflow_tool(task_name: str) -> AsyncGenerator[StreamEvent | 
 # ============================================================================
 # 演示用的Agent配置
 # ============================================================================
+
 
 def create_demo_agent():
     """创建演示用的Agent，集成所有流式工具"""
@@ -311,7 +314,7 @@ def create_demo_agent():
             research_and_summarize_tool,
             simple_typewriter_tool,
             traditional_file_analyzer,
-            complex_workflow_tool
+            complex_workflow_tool,
         ],
     )
 
@@ -319,6 +322,7 @@ def create_demo_agent():
 # ============================================================================
 # 核心演示函数
 # ============================================================================
+
 
 async def demo_core_scenarios():
     """演示@streaming_tool的核心使用场景"""
@@ -333,18 +337,18 @@ async def demo_core_scenarios():
         {
             "name": "场景一：多阶段进度更新",
             "input": "请处理来自 https://api.example.com/data 的数据，批大小设为50",
-            "description": "演示如何在长时间任务中提供详细的阶段性进度反馈"
+            "description": "演示如何在长时间任务中提供详细的阶段性进度反馈",
         },
         {
             "name": "场景二：RAG打字机效果",
             "input": "请研究并总结'人工智能'这个主题",
-            "description": "演示检索增强生成(RAG)场景中的流式文本输出"
+            "description": "演示检索增强生成(RAG)场景中的流式文本输出",
         },
         {
             "name": "场景三：括号事件演示",
             "input": "执行名为'机器学习模型训练'的复杂工作流",
-            "description": "演示enable_bracketing=True如何提供清晰的流程边界"
-        }
+            "description": "演示enable_bracketing=True如何提供清晰的流程边界",
+        },
     ]
 
     for i, scenario in enumerate(scenarios, 1):
@@ -355,7 +359,7 @@ async def demo_core_scenarios():
         print(f"{'-' * 60}")
         print("流式事件序列:")
 
-        result = Runner.run_streamed(demo_agent, input=scenario['input'])
+        result = Runner.run_streamed(demo_agent, input=scenario["input"])
 
         event_count = 0
         async for event in result.stream_events():
@@ -415,7 +419,7 @@ async def demo_agent_as_tool():
             if event.tool_name == "run_file_analysis":
                 indent_level += 1
         elif event.type == "streaming_tool_end_event":
-            if hasattr(event, 'tool_name') and event.tool_name == "run_file_analysis":
+            if hasattr(event, "tool_name") and event.tool_name == "run_file_analysis":
                 indent_level = max(0, indent_level - 1)
             print(f"{indent}[{event_count:2d}] 🏁 结束调用: {event.tool_name}")
         elif event.type == "notify_stream_event":
@@ -445,9 +449,7 @@ async def demo_direct_tool_calls():
 
     event_count = 0
     async for event in data_pipeline_tool.on_invoke_tool(
-        ctx,
-        '{"source_url": "https://example.com/api", "batch_size": 50}',
-        "direct_demo_call"
+        ctx, '{"source_url": "https://example.com/api", "batch_size": 50}', "direct_demo_call"
     ):
         event_count += 1
         if isinstance(event, NotifyStreamEvent):
@@ -471,7 +473,7 @@ async def demo_quick_reference():
         ("标记特殊事件类型", "yield NotifyStreamEvent(data='...', tag='success')", "否"),
         ("提供工具最终结果", "yield '最终的字符串结果' (作为最后一个yield)", "是"),
         ("启用流程括号事件", "@streaming_tool(enable_bracketing=True)", "否"),
-        ("Agent作为流式工具", "agent.as_tool(streaming=True)", "是(由子流程决定)")
+        ("Agent作为流式工具", "agent.as_tool(streaming=True)", "是(由子流程决定)"),
     ]
 
     print(f"{'开发者意图':<20} {'应编写的代码':<45} {'影响对话历史?'}")
@@ -487,6 +489,7 @@ async def demo_quick_reference():
 
 if __name__ == "__main__":
     """运行完整的@streaming_tool演示套件"""
+
     async def main():
         await demo_core_scenarios()
         await demo_agent_as_tool()

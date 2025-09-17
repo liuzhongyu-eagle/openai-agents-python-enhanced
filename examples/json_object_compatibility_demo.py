@@ -29,6 +29,7 @@ from agents import (
 # 定义测试用的数据模型
 class UserProfile(BaseModel):
     """用户个人资料信息"""
+
     name: str = Field(description="用户的姓名")
     age: int = Field(description="用户的年龄", ge=0, le=150)
     city: str = Field(description="用户居住的城市")
@@ -39,6 +40,7 @@ class UserProfile(BaseModel):
 @dataclass
 class TaskItem:
     """任务项目"""
+
     title: str
     description: str
     priority: int  # 1-5, 5 为最高优先级
@@ -67,13 +69,16 @@ def demo_json_object_output_schema():
 
     print("\n验证 JSON 输出:")
     print("-" * 40)
-    test_json = json.dumps({
-        "name": "张三",
-        "age": 25,
-        "city": "北京",
-        "is_active": True,
-        "interests": ["编程", "阅读", "旅行"]
-    }, ensure_ascii=False)
+    test_json = json.dumps(
+        {
+            "name": "张三",
+            "age": 25,
+            "city": "北京",
+            "is_active": True,
+            "interests": ["编程", "阅读", "旅行"],
+        },
+        ensure_ascii=False,
+    )
 
     try:
         validated_result = output_schema.validate_json(test_json)
@@ -112,7 +117,7 @@ def demo_validation():
     schema = JsonObjectOutputSchema(UserProfile)
 
     # 测试有效的 JSON
-    valid_json = '''
+    valid_json = """
     {
         "name": "张三",
         "age": 25,
@@ -120,7 +125,7 @@ def demo_validation():
         "is_active": true,
         "interests": ["编程", "阅读", "旅行"]
     }
-    '''
+    """
 
     print("验证有效 JSON:")
     print("-" * 40)
@@ -132,7 +137,7 @@ def demo_validation():
         print(f"验证失败: {e}")
 
     # 测试需要修复的 JSON（缺少引号）
-    malformed_json = '''
+    malformed_json = """
     {
         name: "李四",
         age: 30,
@@ -140,7 +145,7 @@ def demo_validation():
         is_active: true,
         interests: ["音乐", "运动"]
     }
-    '''
+    """
 
     print("\n验证需要修复的 JSON:")
     print("-" * 40)
@@ -164,14 +169,14 @@ def demo_dataclass_support():
     print(f"- 目标类型: {schema.target_type.__name__}")
 
     # 测试验证
-    test_json = '''
+    test_json = """
     {
         "title": "完成项目文档",
         "description": "编写项目的技术文档和用户手册",
         "priority": 1,
         "completed": false
     }
-    '''
+    """
 
     print("\n验证 dataclass JSON:")
     print("-" * 40)
@@ -203,10 +208,7 @@ Example: {"name": "John Doe", "age": 25, "city": "Beijing", "is_active": true, "
 Output only valid JSON with no additional text or explanations.
 """
 
-    schema = JsonObjectOutputSchema(
-        UserProfile,
-        custom_instructions=custom_instructions
-    )
+    schema = JsonObjectOutputSchema(UserProfile, custom_instructions=custom_instructions)
 
     print("自定义指令:")
     print("-" * 40)
@@ -223,31 +225,30 @@ def demo_agent_integration():
     json_object_agent = Agent(
         name="JsonObjectAgent",
         instructions="你是一个专业的用户信息处理助手",
-        output_type=JsonObjectOutputSchema(UserProfile)
+        output_type=JsonObjectOutputSchema(UserProfile),
     )
 
     print("JsonObjectOutputSchema Agent:")
     print(f"- Agent 名称: {json_object_agent.name}")
     print(f"- 输出类型: {type(json_object_agent.output_type).__name__}")
-    if json_object_agent.output_type and hasattr(json_object_agent.output_type, 'target_type'):
+    if json_object_agent.output_type and hasattr(json_object_agent.output_type, "target_type"):
         print(f"- 目标类型: {json_object_agent.output_type.target_type.__name__}")
-    if json_object_agent.output_type and hasattr(json_object_agent.output_type, 'should_inject_to_system_prompt'):
+    if json_object_agent.output_type and hasattr(
+        json_object_agent.output_type, "should_inject_to_system_prompt"
+    ):
         print(f"- 需要注入: {json_object_agent.output_type.should_inject_to_system_prompt()}")
 
     # 使用标准 AgentOutputSchema 的 Agent（业务层控制）
     standard_agent = Agent(
         name="StandardAgent",
         instructions="你是一个标准的用户信息处理助手",
-        output_type=AgentOutputSchema(UserProfile)
+        output_type=AgentOutputSchema(UserProfile),
     )
 
     print("\n标准 AgentOutputSchema Agent:")
     print(f"- Agent 名称: {standard_agent.name}")
     print(f"- 输出类型: {type(standard_agent.output_type).__name__}")
     print("- 说明: 业务层根据模型能力选择合适的 Schema")
-
-
-
 
 
 def demo_factory_methods():
@@ -301,6 +302,7 @@ def main():
     except Exception as e:
         print(f"\n演示过程中出现错误: {e}")
         import traceback
+
         traceback.print_exc()
 
 

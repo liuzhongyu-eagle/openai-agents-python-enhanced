@@ -234,8 +234,9 @@ class OpenAIChatCompletionsModel(Model):
             schema_injection = ""
 
             # 检查 JsonObjectOutputSchema 的注入需求
-            if (hasattr(output_schema, 'should_inject_to_system_prompt') and
-                hasattr(output_schema, 'get_system_prompt_injection')):
+            if hasattr(output_schema, "should_inject_to_system_prompt") and hasattr(
+                output_schema, "get_system_prompt_injection"
+            ):
                 if callable(output_schema.should_inject_to_system_prompt):
                     # JsonObjectOutputSchema 总是需要注入
                     if output_schema.should_inject_to_system_prompt():

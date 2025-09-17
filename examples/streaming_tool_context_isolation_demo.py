@@ -31,6 +31,7 @@ from agents import (
 # 示例：嵌套 Agent 的 streaming_tool
 # ============================================================================
 
+
 @streaming_tool
 async def nested_agent_tool(task: str) -> AsyncGenerator[StreamEvent | str, Any]:
     """包含嵌套 agent 的 streaming_tool
@@ -58,6 +59,7 @@ async def nested_agent_tool(task: str) -> AsyncGenerator[StreamEvent | str, Any]
 # 演示函数
 # ============================================================================
 
+
 async def demo_context_isolation_events():
     """演示上下文隔离的事件流"""
     print("=" * 70)
@@ -83,8 +85,8 @@ async def demo_context_isolation_events():
 
     # 模拟统计
     context_events = 2  # 模拟的 StreamingToolContextEvent 数量
-    notify_events = 3   # 模拟的 NotifyStreamEvent 数量
-    run_item_events = 1 # 模拟的其他事件数量
+    notify_events = 3  # 模拟的 NotifyStreamEvent 数量
+    run_item_events = 1  # 模拟的其他事件数量
     event_count = context_events + notify_events + run_item_events
 
     print("\n📊 事件统计:")
@@ -115,7 +117,7 @@ async def demo_client_event_handling():
 
     print("\n📋 推荐的客户端事件处理模式:")
 
-    client_code = '''
+    client_code = """
 // JavaScript 客户端处理示例
 class StreamingToolEventHandler {
     constructor() {
@@ -123,24 +125,24 @@ class StreamingToolEventHandler {
         this.mainConversationContainer = document.getElementById('main-conversation');
         this.notificationContainer = document.getElementById('notifications');
     }
-    
+
     handleEvent(eventData) {
         switch(eventData.event_type) {
             case 'streaming_tool_context_event':
                 // 内部事件 - 仅用于展示，不影响对话
                 this.showInternalProgress(eventData);
                 break;
-                
+
             case 'run_item_stream_event':
                 // 主对话事件 - 更新对话历史
                 this.updateMainConversation(eventData);
                 break;
-                
+
             case 'notify_stream_event':
                 // 通知事件 - 显示进度通知
                 this.showNotification(eventData);
                 break;
-                
+
             case 'streaming_tool_start_event':
                 // 工具开始 - 显示工具状态
                 this.showToolStart(eventData);
@@ -152,42 +154,42 @@ class StreamingToolEventHandler {
                 break;
         }
     }
-    
+
     showInternalProgress(eventData) {
         const internalEvent = eventData.internal_event;
         const toolName = eventData.tool_name;
-        
+
         // 在专门的内部进度区域显示
         const progressItem = document.createElement('div');
         progressItem.className = 'internal-progress-item';
         progressItem.innerHTML = `
-            <span class="tool-name">${toolName}</span>: 
+            <span class="tool-name">${toolName}</span>:
             <span class="event-type">${internalEvent.event_type}</span>
         `;
-        
+
         this.internalProgressContainer.appendChild(progressItem);
-        
+
         // 可选：自动滚动到最新进度
         progressItem.scrollIntoView({ behavior: 'smooth' });
     }
-    
+
     updateMainConversation(eventData) {
         // 这些事件会影响对话历史，需要持久化
         const conversationItem = this.createConversationItem(eventData);
         this.mainConversationContainer.appendChild(conversationItem);
-        
+
         // 保存到对话历史
         this.saveToConversationHistory(eventData);
     }
-    
+
     showNotification(eventData) {
         // 显示临时通知
         const notification = document.createElement('div');
         notification.className = `notification ${eventData.tag || 'info'}`;
         notification.textContent = eventData.data;
-        
+
         this.notificationContainer.appendChild(notification);
-        
+
         // 自动消失
         setTimeout(() => {
             notification.remove();
@@ -202,7 +204,7 @@ eventSource.onmessage = function(event) {
     const eventData = JSON.parse(event.data);
     eventHandler.handleEvent(eventData);
 };
-'''
+"""
 
     print(client_code)
 
@@ -215,6 +217,7 @@ eventSource.onmessage = function(event) {
 
 if __name__ == "__main__":
     """运行上下文隔离演示"""
+
     async def main():
         await demo_context_isolation_events()
         await demo_client_event_handling()

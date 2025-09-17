@@ -473,4 +473,3 @@ def test_convert_response_format_json_schema_still_works() -> None:
     assert result["json_schema"]["name"] == "final_output"
     assert "strict" in result["json_schema"]
     assert "schema" in result["json_schema"]
-

@@ -27,6 +27,7 @@ from agents.json_object_output import (
 # 测试用的数据模型
 class UserProfile(BaseModel):
     """用户个人资料信息"""
+
     name: str = Field(description="用户的姓名")
     age: int = Field(description="用户的年龄", ge=0, le=150)
     city: str = Field(description="用户居住的城市")
@@ -36,6 +37,7 @@ class UserProfile(BaseModel):
 @dataclass
 class TaskItem:
     """任务项目"""
+
     title: str
     description: str
     priority: int  # 1-5, 5 为最高优先级
@@ -45,6 +47,7 @@ class TaskItem:
 
 class ProductInfo(TypedDict):
     """产品信息"""
+
     name: str
     price: float
     category: str
@@ -68,10 +71,7 @@ class TestJsonObjectOutputSchema:
         """测试自定义指令"""
         custom_instructions = "Please return user information as JSON with examples."
 
-        schema = JsonObjectOutputSchema(
-            UserProfile,
-            custom_instructions=custom_instructions
-        )
+        schema = JsonObjectOutputSchema(UserProfile, custom_instructions=custom_instructions)
 
         # 应该包含 JSON Schema 和自定义指令
         assert "JSON Schema:" in schema.generated_instructions
@@ -82,12 +82,9 @@ class TestJsonObjectOutputSchema:
         """测试有效 JSON 验证 - Pydantic 模型"""
         schema = JsonObjectOutputSchema(UserProfile)
 
-        valid_json = json.dumps({
-            "name": "张三",
-            "age": 25,
-            "city": "北京",
-            "is_active": True
-        }, ensure_ascii=False)
+        valid_json = json.dumps(
+            {"name": "张三", "age": 25, "city": "北京", "is_active": True}, ensure_ascii=False
+        )
 
         result = schema.validate_json(valid_json)
 
@@ -101,13 +98,16 @@ class TestJsonObjectOutputSchema:
         """测试有效 JSON 验证 - dataclass"""
         schema = JsonObjectOutputSchema(TaskItem)
 
-        valid_json = json.dumps({
-            "title": "完成项目",
-            "description": "完成 JSON 输出兼容性功能",
-            "priority": 5,
-            "completed": False,
-            "tags": ["开发", "功能"]
-        }, ensure_ascii=False)
+        valid_json = json.dumps(
+            {
+                "title": "完成项目",
+                "description": "完成 JSON 输出兼容性功能",
+                "priority": 5,
+                "completed": False,
+                "tags": ["开发", "功能"],
+            },
+            ensure_ascii=False,
+        )
 
         result = schema.validate_json(valid_json)
 
@@ -120,12 +120,10 @@ class TestJsonObjectOutputSchema:
         """测试有效 JSON 验证 - TypedDict"""
         schema = JsonObjectOutputSchema(ProductInfo)
 
-        valid_json = json.dumps({
-            "name": "智能手机",
-            "price": 2999.99,
-            "category": "电子产品",
-            "in_stock": True
-        }, ensure_ascii=False)
+        valid_json = json.dumps(
+            {"name": "智能手机", "price": 2999.99, "category": "电子产品", "in_stock": True},
+            ensure_ascii=False,
+        )
 
         result = schema.validate_json(valid_json)
 
@@ -150,12 +148,15 @@ class TestJsonObjectOutputSchema:
         """测试无效 JSON 结构（简化版，只有严格验证）"""
         schema = JsonObjectOutputSchema(UserProfile)
 
-        invalid_json = json.dumps({
-            "name": "张三",
-            "age": "二十五",  # 应该是数字，不是字符串
-            "city": "北京",
-            "is_active": True
-        }, ensure_ascii=False)
+        invalid_json = json.dumps(
+            {
+                "name": "张三",
+                "age": "二十五",  # 应该是数字，不是字符串
+                "city": "北京",
+                "is_active": True,
+            },
+            ensure_ascii=False,
+        )
 
         with pytest.raises(ModelBehaviorError) as exc_info:
             schema.validate_json(invalid_json)
@@ -188,8 +189,10 @@ class TestInstructionGenerator:
         assert '"type": "string"' in instructions
         assert '"type": "integer"' in instructions
         assert '"type": "boolean"' in instructions
-        assert ("Always respond strictly in the following JSON format "
-                "with no additional explanatory text.") in instructions
+        assert (
+            "Always respond strictly in the following JSON format "
+            "with no additional explanatory text."
+        ) in instructions
 
     def test_generate_instructions_with_schema(self):
         """测试生成的指令包含完整的 JSON Schema"""
@@ -202,15 +205,12 @@ class TestInstructionGenerator:
         assert '"name"' in instructions
         assert '"age"' in instructions
 
-
-
     def test_custom_instructions_append(self):
         """测试自定义指令附加到 JSON Schema 后面"""
         custom_instructions = "Please include examples in your response."
 
         instructions = InstructionGenerator.generate_json_instructions(
-            UserProfile,
-            custom_instructions=custom_instructions
+            UserProfile, custom_instructions=custom_instructions
         )
 
         # 应该包含 JSON Schema 和自定义指令
@@ -219,18 +219,12 @@ class TestInstructionGenerator:
         assert '"properties"' in instructions
 
 
-
-
-
-
-
-
-
 class TestErrorHandling:
     """错误处理测试"""
 
     def test_instruction_generation_error_handling(self):
         """测试指令生成错误处理"""
+
         # 模拟一个会导致错误的类型
         class ProblematicType:
             pass
@@ -243,14 +237,9 @@ class TestErrorHandling:
         """测试验证错误日志记录"""
         schema = JsonObjectOutputSchema(UserProfile)
 
-        invalid_json = json.dumps({
-            "name": "张三",
-            "age": "无效年龄",
-            "city": "北京",
-            "is_active": True
-        })
+        invalid_json = json.dumps(
+            {"name": "张三", "age": "无效年龄", "city": "北京", "is_active": True}
+        )
 
         with pytest.raises(ModelBehaviorError):
             schema.validate_json(invalid_json)
-
-

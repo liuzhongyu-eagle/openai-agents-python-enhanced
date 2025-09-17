@@ -18,17 +18,12 @@ from .util._json_repair import repair_and_validate_json
 logger = logging.getLogger(__name__)
 
 
-
-
-
 class InstructionGenerator:
     """简化的指令生成器，为 JsonObjectOutputSchema 生成结构化指令"""
 
     @classmethod
     def generate_json_instructions(
-        cls,
-        target_type: type[Any],
-        custom_instructions: Optional[str] = None
+        cls, target_type: type[Any], custom_instructions: Optional[str] = None
     ) -> str:
         """
         基于目标类型生成 JSON 输出指令
@@ -61,10 +56,6 @@ class InstructionGenerator:
         return f"JSON Schema:\n{schema_text}\n\n{instructions}"
 
 
-
-
-
-
 class JsonObjectOutputSchema(AgentOutputSchemaBase):
     """
     Compatible output schema for LLM providers that only support {'type': 'json_object'} format.
@@ -79,7 +70,7 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         target_type: type[Any],
         *,
         custom_instructions: Optional[str] = None,
-        enable_json_repair: bool = True
+        enable_json_repair: bool = True,
     ):
         """
         Initialize JsonObjectOutputSchema
@@ -99,11 +90,8 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
 
         # 生成指令
         self._generated_instructions = InstructionGenerator.generate_json_instructions(
-            target_type=target_type,
-            custom_instructions=custom_instructions
+            target_type=target_type, custom_instructions=custom_instructions
         )
-
-
 
     def is_plain_text(self) -> bool:
         """返回 False，表示输出是 JSON 对象而非纯文本"""
@@ -166,15 +154,12 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         # 使用实例配置或参数指定的修复设置
         repair_enabled = enable_repair if enable_repair is not None else self._enable_json_repair
         logger.debug(
-            f"开始验证 JSON（修复功能{'启用' if repair_enabled else '禁用'}）: "
-            f"{json_str[:100]}..."
+            f"开始验证 JSON（修复功能{'启用' if repair_enabled else '禁用'}）: {json_str[:100]}..."
         )
 
         # 使用带修复功能的验证
         result = repair_and_validate_json(
-            json_str=json_str,
-            type_adapter=self._type_adapter,
-            enable_repair=repair_enabled
+            json_str=json_str, type_adapter=self._type_adapter, enable_repair=repair_enabled
         )
 
         if result.success:
@@ -204,30 +189,16 @@ class JsonObjectOutputSchema(AgentOutputSchemaBase):
         return self._target_type
 
     @classmethod
-    def for_pydantic_model(
-        cls,
-        model_class: type[BaseModel],
-        **kwargs
-    ) -> "JsonObjectOutputSchema":
+    def for_pydantic_model(cls, model_class: type[BaseModel], **kwargs) -> "JsonObjectOutputSchema":
         """为 Pydantic 模型创建 JsonObjectOutputSchema"""
         return cls(target_type=model_class, **kwargs)
 
     @classmethod
-    def for_dataclass(
-        cls,
-        dataclass_type: type[Any],
-        **kwargs
-    ) -> "JsonObjectOutputSchema":
+    def for_dataclass(cls, dataclass_type: type[Any], **kwargs) -> "JsonObjectOutputSchema":
         """为 dataclass 创建 JsonObjectOutputSchema"""
         return cls(target_type=dataclass_type, **kwargs)
 
     @classmethod
-    def for_typed_dict(
-        cls,
-        typed_dict_type: type[Any],
-        **kwargs
-    ) -> "JsonObjectOutputSchema":
+    def for_typed_dict(cls, typed_dict_type: type[Any], **kwargs) -> "JsonObjectOutputSchema":
         """为 TypedDict 创建 JsonObjectOutputSchema"""
         return cls(target_type=typed_dict_type, **kwargs)
-
-

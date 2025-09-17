@@ -13,6 +13,7 @@
 - yield "字符串" 用于最终结果
 - 内部 agent 事件被自动包装为 StreamingToolContextEvent，实现上下文隔离
 """
+
 import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any, TypedDict
@@ -23,6 +24,7 @@ from agents.tool import StreamingTool
 
 class DemoConfig(TypedDict):
     """演示配置的类型定义"""
+
     name: str
     tool: StreamingTool
     params: str
@@ -32,6 +34,7 @@ class DemoConfig(TypedDict):
 # ============================================================================
 # 示例1：最简单的流式工具
 # ============================================================================
+
 
 @streaming_tool
 async def simple_progress_tool(task_name: str) -> AsyncGenerator[StreamEvent | str, Any]:
@@ -66,6 +69,7 @@ async def simple_progress_tool(task_name: str) -> AsyncGenerator[StreamEvent | s
 # 示例2：实时倒计时工具
 # ============================================================================
 
+
 @streaming_tool
 async def countdown_tool(seconds: int) -> AsyncGenerator[StreamEvent | str, Any]:
     """倒计时工具 - 演示实时更新和标签使用
@@ -96,6 +100,7 @@ async def countdown_tool(seconds: int) -> AsyncGenerator[StreamEvent | str, Any]
 # ============================================================================
 # 示例3：错误处理演示
 # ============================================================================
+
 
 @streaming_tool
 async def error_demo_tool(should_fail: bool) -> AsyncGenerator[StreamEvent | str, Any]:
@@ -134,6 +139,7 @@ async def error_demo_tool(should_fail: bool) -> AsyncGenerator[StreamEvent | str
 # Agent配置
 # ============================================================================
 
+
 def create_basic_demo_agent():
     """创建基础演示Agent"""
     return Agent(
@@ -153,6 +159,7 @@ def create_basic_demo_agent():
 # 演示函数
 # ============================================================================
 
+
 async def demo_basic_concepts():
     """演示@streaming_tool的基础概念"""
     print("=" * 70)
@@ -164,6 +171,7 @@ async def demo_basic_concepts():
     print("\n说明：本演示直接调用流式工具，展示核心概念，无需配置LLM模型")
 
     from agents.run_context import RunContextWrapper
+
     ctx = RunContextWrapper(context=None)
 
     demos: list[DemoConfig] = [
@@ -171,26 +179,26 @@ async def demo_basic_concepts():
             "name": "基础进度更新",
             "tool": simple_progress_tool,
             "params": '{"task_name": "数据备份"}',
-            "description": "演示最基本的多步骤进度通知"
+            "description": "演示最基本的多步骤进度通知",
         },
         {
             "name": "实时倒计时",
             "tool": countdown_tool,
             "params": '{"seconds": 3}',
-            "description": "演示实时更新和事件标签的使用"
+            "description": "演示实时更新和事件标签的使用",
         },
         {
             "name": "错误处理（成功案例）",
             "tool": error_demo_tool,
             "params": '{"should_fail": false}',
-            "description": "演示正常执行流程"
+            "description": "演示正常执行流程",
         },
         {
             "name": "错误处理（失败案例）",
             "tool": error_demo_tool,
             "params": '{"should_fail": true}',
-            "description": "演示异常处理机制"
-        }
+            "description": "演示异常处理机制",
+        },
     ]
 
     for i, demo in enumerate(demos, 1):
@@ -203,7 +211,7 @@ async def demo_basic_concepts():
 
         event_count = 0
         try:
-            async for event in demo['tool'].on_invoke_tool(ctx, demo['params'], f"demo_{i}"):
+            async for event in demo["tool"].on_invoke_tool(ctx, demo["params"], f"demo_{i}"):
                 event_count += 1
 
                 if isinstance(event, NotifyStreamEvent):
@@ -223,7 +231,7 @@ async def demo_basic_concepts():
                 elif isinstance(event, str):
                     print(f"  [{event_count:2d}] 🎯 最终结果: {event}")
         except Exception as e:
-            print(f"  [{event_count+1:2d}] ❌ 工具执行异常: {e}")
+            print(f"  [{event_count + 1:2d}] ❌ 工具执行异常: {e}")
 
         print(f"📊 事件总数: {event_count}")
 
@@ -244,9 +252,7 @@ async def demo_direct_calls():
 
     event_count = 0
     async for event in simple_progress_tool.on_invoke_tool(
-        ctx,
-        '{"task_name": "系统维护"}',
-        "direct_call_demo"
+        ctx, '{"task_name": "系统维护"}', "direct_call_demo"
     ):
         event_count += 1
         if isinstance(event, NotifyStreamEvent):
@@ -315,7 +321,7 @@ async def demo_key_concepts():
         ("事件标签", "NotifyStreamEvent(tag='success')", "用于前端UI逻辑和事件分类"),
         ("增量输出", "NotifyStreamEvent(is_delta=True)", "用于打字机效果等流式文本"),
         ("终结信号", "yield '字符串' 后停止", "Runner会忽略后续的yield"),
-        ("上下文隔离", "StreamingToolContextEvent", "包装内部事件，实现隔离")
+        ("上下文隔离", "StreamingToolContextEvent", "包装内部事件，实现隔离"),
     ]
 
     print(f"{'概念':<12} {'代码示例':<35} {'说明'}")
@@ -332,6 +338,7 @@ async def demo_key_concepts():
 
 if __name__ == "__main__":
     """运行基础演示套件"""
+
     async def main():
         await demo_basic_concepts()
         await demo_direct_calls()

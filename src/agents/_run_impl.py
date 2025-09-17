@@ -501,9 +501,9 @@ class RunImpl:
                 if output.server_label not in hosted_mcp_server_map:
                     _error_tracing.attach_error_to_current_span(
                         SpanError(
-                        message="MCP server label not found",
-                        data={"server_label": output.server_label}
-                    )
+                            message="MCP server label not found",
+                            data={"server_label": output.server_label},
+                        )
                     )
             elif isinstance(output, McpListTools):
                 items.append(MCPListToolsItem(raw_item=output, agent=agent))
@@ -523,9 +523,8 @@ class RunImpl:
                 if not tool or not isinstance(tool, LocalShellTool):
                     _error_tracing.attach_error_to_current_span(
                         SpanError(
-                        message="Local shell tool not found",
-                        data={"tool_name": "local_shell"}
-                    )
+                            message="Local shell tool not found", data={"tool_name": "local_shell"}
+                        )
                     )
                     raise ModelBehaviorError(
                         f"Local shell tool local_shell not found in agent {agent.name}"
@@ -619,9 +618,7 @@ class RunImpl:
                     span_fn.span_data.input = arguments
 
                 try:
-                    async_gen = tool.on_invoke_tool(
-                        context_wrapper, arguments, tool_call_id
-                    )
+                    async_gen = tool.on_invoke_tool(context_wrapper, arguments, tool_call_id)
                     while True:
                         try:
                             event = await async_gen.__anext__()
@@ -629,15 +626,23 @@ class RunImpl:
                                 final_output = event
                                 break
                             # 为特定事件注入 tool_call_id
-                            if isinstance(
-                                event,
-                                (StreamingToolStartEvent, StreamingToolEndEvent, NotifyStreamEvent),
-                            ) and event.tool_call_id is None:
+                            if (
+                                isinstance(
+                                    event,
+                                    (
+                                        StreamingToolStartEvent,
+                                        StreamingToolEndEvent,
+                                        NotifyStreamEvent,
+                                    ),
+                                )
+                                and event.tool_call_id is None
+                            ):
                                 event.tool_call_id = tool_call_id
 
                             # 实现上下文隔离：包装来自 streaming_tool 内部的事件
                             # streaming_tool 支持 6 大类事件，需要包装会影响对话历史的事件
                             from .stream_events import AgentUpdatedStreamEvent
+
                             if isinstance(
                                 event,
                                 (
@@ -648,14 +653,16 @@ class RunImpl:
                             ):
                                 # 将内部事件包装为容器事件，实现上下文隔离
                                 from .stream_events import StreamingToolContextEvent
+
                                 wrapped_event = StreamingToolContextEvent(
                                     tool_name=tool_name,
                                     tool_call_id=tool_call_id,
-                                    internal_event=event
+                                    internal_event=event,
                                 )
                                 streamed_result._event_queue.put_nowait(wrapped_event)
                             else:
-                                # 其他事件直接传递：NotifyStreamEvent、StreamingToolStartEvent、StreamingToolEndEvent
+                                # 其他事件直接传递：NotifyStreamEvent、StreamingToolStartEvent、
+                                # StreamingToolEndEvent
                                 # 这确保了只有会影响对话历史的事件被包装，其他事件保持原样
                                 streamed_result._event_queue.put_nowait(event)
                         except StopAsyncIteration:
@@ -678,9 +685,7 @@ class RunImpl:
             safe_final_output = str(final_output) if final_output is not None else ""
             tool_output_item = ToolCallOutputItem(
                 output=final_output,
-                raw_item=ItemHelpers.tool_call_output_item(
-                    tool_call, safe_final_output
-                ),
+                raw_item=ItemHelpers.tool_call_output_item(tool_call, safe_final_output),
                 agent=agent,
             )
 
@@ -691,9 +696,7 @@ class RunImpl:
                 )
             )
 
-            return FunctionToolResult(
-                tool=tool, output=final_output, run_item=tool_output_item
-            )
+            return FunctionToolResult(tool=tool, output=final_output, run_item=tool_output_item)
 
         return await asyncio.gather(*[run_single_streaming_tool(run) for run in tool_runs])
 

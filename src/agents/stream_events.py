@@ -128,6 +128,7 @@ class StreamingToolContextEvent:
     只有 RunItemStreamEvent、RawResponsesStreamEvent 和 AgentUpdatedStreamEvent 会被包装，
     其他事件类型直接传递，确保上下文隔离的同时保持完整的事件流。
     """
+
     tool_name: str
     """生成此事件的 streaming_tool 名称"""
 

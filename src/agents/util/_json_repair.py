@@ -13,6 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 
 try:
     import json_repair
+
     JSON_REPAIR_AVAILABLE = True
 except ImportError:
     JSON_REPAIR_AVAILABLE = False
@@ -34,7 +35,7 @@ class JsonRepairResult:
         parsed_object: Optional[Any] = None,
         original_error: Optional[Exception] = None,
         repair_applied: bool = False,
-        repair_details: Optional[str] = None
+        repair_details: Optional[str] = None,
     ):
         self.success = success
         self.repaired_json = repaired_json
@@ -48,7 +49,7 @@ def repair_and_validate_json(
     json_str: str,
     type_adapter: Optional[TypeAdapter[Any]] = None,
     enable_repair: bool = True,
-    max_repair_attempts: int = 3
+    max_repair_attempts: int = 3,
 ) -> JsonRepairResult:
     """
     修复并验证 JSON 字符串
@@ -77,21 +78,14 @@ def repair_and_validate_json(
                     success=True,
                     repaired_json=json_str,
                     parsed_object=validated_obj,
-                    repair_applied=False
+                    repair_applied=False,
                 )
             except ValidationError as e:
                 logger.debug(f"原始 JSON 类型验证失败: {e}")
-                return JsonRepairResult(
-                    success=False,
-                    original_error=e,
-                    repair_applied=False
-                )
+                return JsonRepairResult(success=False, original_error=e, repair_applied=False)
         else:
             return JsonRepairResult(
-                success=True,
-                repaired_json=json_str,
-                parsed_object=parsed_obj,
-                repair_applied=False
+                success=True, repaired_json=json_str, parsed_object=parsed_obj, repair_applied=False
             )
 
     except json.JSONDecodeError as original_error:
@@ -101,25 +95,18 @@ def repair_and_validate_json(
         if not enable_repair or not JSON_REPAIR_AVAILABLE:
             logger.warning("JSON 修复被禁用或 json-repair 库不可用")
             return JsonRepairResult(
-                success=False,
-                original_error=original_error,
-                repair_applied=False
+                success=False, original_error=original_error, repair_applied=False
             )
 
         # 尝试修复 JSON
-        return _attempt_json_repair(
-            json_str,
-            type_adapter,
-            original_error,
-            max_repair_attempts
-        )
+        return _attempt_json_repair(json_str, type_adapter, original_error, max_repair_attempts)
 
 
 def _attempt_json_repair(
     json_str: str,
     type_adapter: Optional[TypeAdapter[Any]],
     original_error: Exception,
-    max_attempts: int
+    max_attempts: int,
 ) -> JsonRepairResult:
     """
     尝试修复 JSON 字符串
@@ -190,7 +177,7 @@ def _attempt_json_repair(
                             repaired_json=repaired_json,
                             parsed_object=validated_obj,
                             repair_applied=True,
-                            repair_details=f"{repair_method}（第{attempt}次尝试）"
+                            repair_details=f"{repair_method}（第{attempt}次尝试）",
                         )
                     except ValidationError as e:
                         logger.debug(f"修复后的 JSON 类型验证失败: {e}")
@@ -203,7 +190,7 @@ def _attempt_json_repair(
                         repaired_json=repaired_json,
                         parsed_object=parsed_obj,
                         repair_applied=True,
-                        repair_details=f"{repair_method}（第{attempt}次尝试）"
+                        repair_details=f"{repair_method}（第{attempt}次尝试）",
                     )
 
             except json.JSONDecodeError as e:
@@ -220,15 +207,12 @@ def _attempt_json_repair(
         success=False,
         original_error=original_error,
         repair_applied=True,
-        repair_details=f"修复失败，已尝试 {max_attempts} 次"
+        repair_details=f"修复失败，已尝试 {max_attempts} 次",
     )
 
 
 def validate_json_with_repair(
-    json_str: str,
-    type_adapter: TypeAdapter[Any],
-    enable_repair: bool = True,
-    partial: bool = False
+    json_str: str, type_adapter: TypeAdapter[Any], enable_repair: bool = True, partial: bool = False
 ) -> Any:
     """
     带修复功能的 JSON 验证（兼容现有 _json.validate_json 接口）
@@ -248,13 +232,12 @@ def validate_json_with_repair(
     # 如果启用了部分验证，使用原有逻辑（不进行修复）
     if partial:
         from . import _json
+
         return _json.validate_json(json_str, type_adapter, partial=True)
 
     # 尝试修复和验证
     result = repair_and_validate_json(
-        json_str=json_str,
-        type_adapter=type_adapter,
-        enable_repair=enable_repair
+        json_str=json_str, type_adapter=type_adapter, enable_repair=enable_repair
     )
 
     if result.success:
@@ -269,7 +252,7 @@ def validate_json_with_repair(
                 data={
                     "original_json": json_str[:200],
                     "repair_attempted": result.repair_applied,
-                    "repair_details": result.repair_details
+                    "repair_details": result.repair_details,
                 },
             )
         )

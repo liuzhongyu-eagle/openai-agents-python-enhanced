@@ -3,6 +3,7 @@ streaming_tool 功能的单元测试
 
 测试 streaming_tool 装饰器、相关事件类型以及流式工具的行为是否符合预期。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -51,10 +52,7 @@ class TestStreamingToolDecorator:
     def test_streaming_tool_with_custom_name_and_description(self):
         """测试自定义名称和描述的 streaming_tool"""
 
-        @streaming_tool(
-            name_override="custom_tool",
-            description_override="自定义描述"
-        )
+        @streaming_tool(name_override="custom_tool", description_override="自定义描述")
         async def original_name(data: str) -> AsyncGenerator[StreamEvent | str, Any]:
             yield f"处理: {data}"
 
@@ -66,9 +64,7 @@ class TestStreamingToolDecorator:
 
         @streaming_tool
         async def tool_with_defaults(
-            required_param: str,
-            optional_param: int = 42,
-            optional_str: str = "默认值"
+            required_param: str, optional_param: int = 42, optional_str: str = "默认值"
         ) -> AsyncGenerator[StreamEvent | str, Any]:
             """带有可选参数的工具
 
@@ -222,7 +218,7 @@ class TestStreamingToolEvents:
             is_delta=True,
             tag="progress",
             tool_name="test_tool",
-            tool_call_id="call_123"
+            tool_call_id="call_123",
         )
         assert event_full.data == "增量消息"
         assert event_full.is_delta is True
@@ -235,9 +231,7 @@ class TestStreamingToolEvents:
 
         input_args = {"param1": "value1", "param2": 42}
         event = StreamingToolStartEvent(
-            tool_name="test_tool",
-            tool_call_id="call_456",
-            input_args=input_args
+            tool_name="test_tool", tool_call_id="call_456", input_args=input_args
         )
 
         assert event.tool_name == "test_tool"
@@ -248,10 +242,7 @@ class TestStreamingToolEvents:
     def test_tool_stream_end_event_creation(self):
         """测试 StreamingToolEndEvent 的创建和属性"""
 
-        event = StreamingToolEndEvent(
-            tool_name="test_tool",
-            tool_call_id="call_789"
-        )
+        event = StreamingToolEndEvent(tool_name="test_tool", tool_call_id="call_789")
 
         assert event.tool_name == "test_tool"
         assert event.tool_call_id == "call_789"
@@ -277,17 +268,15 @@ class TestStreamingToolIntegration:
 
         # 创建模拟模型
         model = FakeModel()
-        model.set_next_output([
-            get_function_tool_call("progress_tool", json.dumps({"task": "数据处理"})),
-            get_text_message("任务执行完毕")
-        ])
+        model.set_next_output(
+            [
+                get_function_tool_call("progress_tool", json.dumps({"task": "数据处理"})),
+                get_text_message("任务执行完毕"),
+            ]
+        )
 
         # 创建 Agent
-        agent = Agent(
-            name="测试代理",
-            model=model,
-            tools=[progress_tool]
-        )
+        agent = Agent(name="测试代理", model=model, tools=[progress_tool])
 
         # 运行并收集事件
         result = Runner.run_streamed(agent, input="请执行数据处理任务")
@@ -366,8 +355,7 @@ class TestStreamingToolIntegration:
 
         @streaming_tool(enable_bracketing=False)
         async def context_tool(
-            ctx: RunContextWrapper,
-            message: str
+            ctx: RunContextWrapper, message: str
         ) -> AsyncGenerator[StreamEvent | str, Any]:
             """需要上下文的流式工具（上下文参数必须在第一位）"""
             is_context_valid = isinstance(ctx, RunContextWrapper)
@@ -438,18 +426,16 @@ class TestStreamingToolIntegration:
 
         # 创建模拟模型，模拟调用两个工具
         model = FakeModel()
-        model.add_multiple_turn_outputs([
-            [get_function_tool_call("tool_a", json.dumps({"data": "测试A"}))],
-            [get_function_tool_call("tool_b", json.dumps({"data": "测试B"}))],
-            [get_text_message("所有工具执行完毕")]
-        ])
+        model.add_multiple_turn_outputs(
+            [
+                [get_function_tool_call("tool_a", json.dumps({"data": "测试A"}))],
+                [get_function_tool_call("tool_b", json.dumps({"data": "测试B"}))],
+                [get_text_message("所有工具执行完毕")],
+            ]
+        )
 
         # 创建 Agent
-        agent = Agent(
-            name="多工具代理",
-            model=model,
-            tools=[tool_a, tool_b]
-        )
+        agent = Agent(name="多工具代理", model=model, tools=[tool_a, tool_b])
 
         # 运行并收集事件
         result = Runner.run_streamed(agent, input="请依次执行工具A和工具B")
@@ -486,34 +472,32 @@ class TestStreamingToolAdvanced:
             yield f"子工具完成: {task}"
 
         sub_model = FakeModel()
-        sub_model.set_next_output([
-            get_function_tool_call("sub_tool", json.dumps({"task": "子任务"})),
-            get_text_message("子Agent完成")
-        ])
-
-        sub_agent = Agent(
-            name="子代理",
-            model=sub_model,
-            tools=[sub_tool]
+        sub_model.set_next_output(
+            [
+                get_function_tool_call("sub_tool", json.dumps({"task": "子任务"})),
+                get_text_message("子Agent完成"),
+            ]
         )
+
+        sub_agent = Agent(name="子代理", model=sub_model, tools=[sub_tool])
 
         # 创建主 Agent，使用子 Agent 作为流式工具
         main_model = FakeModel()
-        main_model.set_next_output([
-            get_function_tool_call("run_sub_agent", json.dumps({"input": "执行子任务"})),
-            get_text_message("主Agent完成")
-        ])
+        main_model.set_next_output(
+            [
+                get_function_tool_call("run_sub_agent", json.dumps({"input": "执行子任务"})),
+                get_text_message("主Agent完成"),
+            ]
+        )
 
         main_agent = Agent(
             name="主代理",
             model=main_model,
             tools=[
                 sub_agent.as_tool(
-                    tool_name="run_sub_agent",
-                    tool_description="运行子代理",
-                    streaming=True
+                    tool_name="run_sub_agent", tool_description="运行子代理", streaming=True
                 )
-            ]
+            ],
         )
 
         # 运行并收集事件
@@ -543,35 +527,33 @@ class TestStreamingToolAdvanced:
             yield f"子工具完成: {task}"
 
         sub_model = FakeModel()
-        sub_model.set_next_output([
-            get_function_tool_call("complex_sub_tool", json.dumps({"task": "复杂任务"})),
-            get_text_message("子Agent的消息输出"),  # 这会产生 MessageOutputItem
-            get_text_message("子Agent完成")
-        ])
-
-        sub_agent = Agent(
-            name="子代理",
-            model=sub_model,
-            tools=[complex_sub_tool]
+        sub_model.set_next_output(
+            [
+                get_function_tool_call("complex_sub_tool", json.dumps({"task": "复杂任务"})),
+                get_text_message("子Agent的消息输出"),  # 这会产生 MessageOutputItem
+                get_text_message("子Agent完成"),
+            ]
         )
+
+        sub_agent = Agent(name="子代理", model=sub_model, tools=[complex_sub_tool])
 
         # 创建主 Agent
         main_model = FakeModel()
-        main_model.set_next_output([
-            get_function_tool_call("run_sub_agent", json.dumps({"input": "执行复杂任务"})),
-            get_text_message("主Agent完成")  # 这会产生 MessageOutputItem
-        ])
+        main_model.set_next_output(
+            [
+                get_function_tool_call("run_sub_agent", json.dumps({"input": "执行复杂任务"})),
+                get_text_message("主Agent完成"),  # 这会产生 MessageOutputItem
+            ]
+        )
 
         main_agent = Agent(
             name="主代理",
             model=main_model,
             tools=[
                 sub_agent.as_tool(
-                    tool_name="run_sub_agent",
-                    tool_description="运行子代理",
-                    streaming=True
+                    tool_name="run_sub_agent", tool_description="运行子代理", streaming=True
                 )
-            ]
+            ],
         )
 
         # 运行主 Agent（使用 streaming 模式）
@@ -596,13 +578,15 @@ class TestStreamingToolAdvanced:
 
         for context_event in context_events:
             assert context_event.tool_name == "run_sub_agent"
-            assert hasattr(context_event, 'internal_event')
+            assert hasattr(context_event, "internal_event")
 
             # 内部事件应该是 RunItemStreamEvent、RawResponsesStreamEvent 或 AgentUpdatedStreamEvent
             # 验证类型限制：只有这三种类型的事件会被包装
             allowed_types = (RunItemStreamEvent, RawResponsesStreamEvent, AgentUpdatedStreamEvent)
-            assert isinstance(context_event.internal_event, allowed_types), \
-                f"StreamingToolContextEvent 只应包装允许的事件类型，但收到了 {type(context_event.internal_event)}"
+            assert isinstance(context_event.internal_event, allowed_types), (
+                f"StreamingToolContextEvent 只应包装允许的事件类型，"
+                f"但收到了 {type(context_event.internal_event)}"
+            )
 
             if isinstance(context_event.internal_event, RunItemStreamEvent):
                 run_item_events.append(context_event)
@@ -699,9 +683,7 @@ class TestStreamingToolAdvanced:
 
         @streaming_tool(enable_bracketing=False)
         async def validated_tool(
-            required_str: str,
-            required_int: int,
-            optional_bool: bool = False
+            required_str: str, required_int: int, optional_bool: bool = False
         ) -> AsyncGenerator[StreamEvent | str, Any]:
             """需要参数验证的工具"""
             yield NotifyStreamEvent(data=f"参数: {required_str}, {required_int}, {optional_bool}")
@@ -714,7 +696,7 @@ class TestStreamingToolAdvanced:
         async for event in validated_tool.on_invoke_tool(
             ctx,
             '{"required_str": "测试", "required_int": 42, "optional_bool": true}',
-            "validation_test"
+            "validation_test",
         ):
             events.append(event)
 
@@ -754,9 +736,7 @@ class TestStreamingToolAdvanced:
         async def run_tool_1():
             events = []
             async for event in concurrent_tool.on_invoke_tool(
-                ctx1,
-                '{"delay": 0.001, "name": "工具1"}',
-                "concurrent_1"
+                ctx1, '{"delay": 0.001, "name": "工具1"}', "concurrent_1"
             ):
                 events.append(event)
             return events
@@ -764,9 +744,7 @@ class TestStreamingToolAdvanced:
         async def run_tool_2():
             events = []
             async for event in concurrent_tool.on_invoke_tool(
-                ctx2,
-                '{"delay": 0.001, "name": "工具2"}',
-                "concurrent_2"
+                ctx2, '{"delay": 0.001, "name": "工具2"}', "concurrent_2"
             ):
                 events.append(event)
             return events

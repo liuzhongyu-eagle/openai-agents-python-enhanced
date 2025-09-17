@@ -36,7 +36,6 @@ from .util import _error_tracing
 from .util._types import MaybeAwaitable
 
 if TYPE_CHECKING:
-
     from .agent import Agent
 
 ToolParams = ParamSpec("ToolParams")
@@ -88,8 +87,6 @@ class StreamingTool:
 
     params_json_schema: dict[str, Any]
     """The JSON schema for the tool's parameters."""
-
-
 
     on_invoke_tool: Callable[
         [RunContextWrapper[Any], str, str], AsyncGenerator[StreamEvent | str, Any]
@@ -624,7 +621,8 @@ def streaming_tool(
                     combined_args = {}
                     # 将位置参数按照函数签名映射到参数名
                     param_names = [
-                        name for i, (name, param) in enumerate(schema.signature.parameters.items())
+                        name
+                        for i, (name, param) in enumerate(schema.signature.parameters.items())
                         if not (schema.takes_context and i == 0)  # 跳过上下文参数
                     ]
                     for i, arg_value in enumerate(args):
