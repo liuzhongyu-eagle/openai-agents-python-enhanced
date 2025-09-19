@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from .lifecycle import AgentHooks
     from .mcp import MCPServer
     from .result import RunResult
+    from .run import RunConfig
 
 
 @dataclass
@@ -208,6 +209,7 @@ class Agent(Generic[TContext]):
         custom_output_extractor: Callable[[RunResult], Awaitable[str]] | None = None,
         streaming: bool = False,
         enable_bracketing: bool = True,
+        run_config: RunConfig | None = None,
     ) -> Tool:
         """Transform this agent into a tool, callable by other agents.
 
@@ -226,6 +228,9 @@ class Agent(Generic[TContext]):
             streaming: Whether to create a streaming tool that yields events during execution.
             enable_bracketing: Whether to emit StreamingToolStartEvent and StreamingToolEndEvent for
                 clear process orchestration. Only applies when streaming=True.
+            run_config: Optional RunConfig to use when running this agent as a tool. If not
+                provided, will use default RunConfig. This allows you to specify custom model
+                providers, model settings, and other configuration options for the tool execution.
         """
 
         from .run import Runner
@@ -244,6 +249,7 @@ class Agent(Generic[TContext]):
                     starting_agent=self,
                     input=input,
                     context=context.context,
+                    run_config=run_config,
                 )
                 if custom_output_extractor:
                     return await custom_output_extractor(output)
@@ -265,6 +271,7 @@ class Agent(Generic[TContext]):
                     starting_agent=self,
                     input=input,
                     context=context.context,
+                    run_config=run_config,
                 )
 
                 # 直接传递所有事件，上下文隔离在 streaming_tool 执行层面实现

@@ -371,7 +371,7 @@ async def main():
 
 ### Customizing tool-agents
 
-The `agent.as_tool` function is a convenience method to make it easy to turn an agent into a tool. It doesn't support all configuration though; for example, you can't set `max_turns`. For advanced use cases, use `Runner.run` directly in your tool implementation:
+The `agent.as_tool` function is a convenience method to make it easy to turn an agent into a tool. It supports most common configuration options including `run_config` for custom model providers and settings. For advanced use cases that require additional configuration (e.g., `max_turns`), use `Runner.run` directly in your tool implementation:
 
 ```python
 @function_tool
@@ -389,6 +389,41 @@ async def run_my_agent() -> str:
 
     return str(result.final_output)
 ```
+
+### Using custom model providers with tool-agents
+
+You can pass a `run_config` parameter to `as_tool()` to specify custom model providers, model settings, and other configuration options for the tool execution. This is particularly useful when you need to use different models or providers for different agents:
+
+```python
+from agents import Agent, RunConfig, ModelProvider
+
+# Create a custom model provider for enterprise models
+custom_provider = MyCustomModelProvider()
+run_config = RunConfig(model_provider=custom_provider)
+
+# Create an agent that uses a custom model prefix
+enterprise_agent = Agent(
+    name="EnterpriseAgent",
+    instructions="You are an enterprise AI assistant",
+    model="doubao/enterprise-model"  # Custom model prefix
+)
+
+# Convert to tool with custom run_config
+enterprise_tool = enterprise_agent.as_tool(
+    tool_name="enterprise_assistant",
+    tool_description="Access enterprise AI capabilities",
+    run_config=run_config  # Pass custom configuration
+)
+
+# Use in main agent
+main_agent = Agent(
+    name="MainAgent",
+    instructions="You coordinate different AI capabilities",
+    tools=[enterprise_tool]
+)
+```
+
+This ensures that when the tool is executed, it uses the specified model provider and configuration, rather than falling back to the default settings.
 
 ### Custom output extraction
 

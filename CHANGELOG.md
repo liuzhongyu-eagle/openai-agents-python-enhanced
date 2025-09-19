@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-01-19
+
+### Added
+- **Agent.as_tool() RunConfig 支持**：为 `Agent.as_tool()` 方法添加了 `run_config` 参数支持
+  - 新增 `run_config: RunConfig | None = None` 参数，允许为工具 Agent 指定自定义配置
+  - 支持自定义模型提供者，解决企业级部署中的模型前缀问题（如 `doubao/`, `deepseek/` 等）
+  - 同时支持流式和非流式工具的 RunConfig 传递
+  - 保持完全的向后兼容性，现有代码无需修改
+
+### Enhanced
+- **企业级部署支持**：现在可以在 Agent 作为工具时使用自定义模型提供者和配置
+- **配置隔离**：不同工具可以使用不同的 RunConfig，实现更灵活的配置管理
+- **文档改进**：更新了 `docs/tools.md`，添加了自定义模型提供者的使用示例
+
+### Fixed
+- **RunConfig 传递问题**：修复了 `Agent.as_tool()` 内部调用 `Runner.run()` 时不传递 `run_config` 的问题
+- **模型提供者配置**：解决了工具 Agent 无法使用主 Agent 的自定义模型提供者配置的问题
+
 ## [0.2.1] - 2025-07-22
 
 ### Fixed
