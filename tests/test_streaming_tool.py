@@ -183,18 +183,21 @@ class TestStreamingToolDecorator:
         assert isinstance(events[2], StreamingToolEndEvent)
         assert isinstance(events[3], str)
 
-        # 测试错误情况
-        with pytest.raises(ValueError, match="故意的错误"):
-            events = []
-            async for event in error_tool.on_invoke_tool(
-                ctx, '{"should_fail": true}', "error_test"
-            ):
-                events.append(event)
+        # 测试错误情况 - 现在应该返回错误消息而不是抛出异常
+        events = []
+        async for event in error_tool.on_invoke_tool(
+            ctx, '{"should_fail": true}', "error_test"
+        ):
+            events.append(event)
 
-        # 即使出错，也应该收到开始事件和通知事件
-        assert len(events) >= 2
+        # 应该收到开始事件、通知事件、结束事件和错误消息
+        assert len(events) == 4
         assert isinstance(events[0], StreamingToolStartEvent)
         assert isinstance(events[1], NotifyStreamEvent)
+        assert isinstance(events[2], StreamingToolEndEvent)
+        assert isinstance(events[3], str)
+        assert "An error occurred while running the tool" in events[3]
+        assert "故意的错误" in events[3]
 
 
 class TestStreamingToolEvents:
@@ -664,18 +667,41 @@ class TestStreamingToolAdvanced:
         assert isinstance(events[2], str)
         assert "操作完成" in events[2]
 
-        # 测试失败情况
-        with pytest.raises(RuntimeError, match="工具执行失败"):
-            events = []
-            async for event in error_prone_tool.on_invoke_tool(
-                ctx, '{"should_fail": "true"}', "error_test"
-            ):
-                events.append(event)
+        # 测试失败情况 - 现在应该返回错误消息而不是抛出异常
+        events = []
+        async for event in error_prone_tool.on_invoke_tool(
+            ctx, '{"should_fail": "true"}', "error_test"
+        ):
+            events.append(event)
 
-        # 即使出错，也应该收到开始执行的通知
-        assert len(events) >= 1
+        # 应该收到开始执行的通知和错误消息
+        assert len(events) == 2
         assert isinstance(events[0], NotifyStreamEvent)
         assert "开始执行可能失败的操作" in events[0].data
+        assert isinstance(events[1], str)
+        assert "An error occurred while running the tool" in events[1]
+        assert "工具执行失败" in events[1]
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_error_handling_with_none_error_function(self):
+        """测试 failure_error_function=None 时的错误处理"""
+
+        @streaming_tool(failure_error_function=None)
+        async def error_tool_no_handler(should_fail: bool) -> AsyncGenerator[StreamEvent | str, Any]:
+            yield NotifyStreamEvent(data="开始执行")
+            if should_fail:
+                raise ValueError("应该抛出的错误")
+            yield "成功完成"
+
+        ctx = RunContextWrapper(context=None)
+
+        # 测试错误情况 - 应该抛出异常
+        with pytest.raises(ValueError, match="应该抛出的错误"):
+            events = []
+            async for event in error_tool_no_handler.on_invoke_tool(
+                ctx, '{"should_fail": true}', "error_test"
+            ):
+                events.append(event)
 
     @pytest.mark.asyncio
     async def test_streaming_tool_parameter_validation(self):

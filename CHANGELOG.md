@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2025-01-23
+
+### Added
+- **@streaming_tool failure_error_function 支持**：为 `@streaming_tool` 装饰器添加了与 `@function_tool` 一致的异常处理机制
+  - 新增 `failure_error_function: ToolErrorFunction | None = default_tool_error_function` 参数
+  - 支持自定义错误处理函数，当工具调用失败时生成错误消息发送给 LLM
+  - 与 `@function_tool` 保持完全一致的异常处理行为
+  - 确保 Hook 框架（如 `UserConfirmationHook`）在流式工具上正常工作
+
+### Enhanced
+- **开发者体验一致性**：统一了 `@function_tool` 和 `@streaming_tool` 的异常处理模式
+- **Hook 框架兼容性**：现在 Hook 拦截后，流式工具也会返回错误消息而不是导致整个 Agent 崩溃
+- **错误跟踪完善**：添加了与 `@function_tool` 一致的错误跟踪机制
+- **日志记录改进**：完善了参数和完成状态的日志记录，与 `@function_tool` 保持一致
+- **文档质量提升**：改进了 `@streaming_tool` 的文档字符串，提供详细的参数说明
+
+### Fixed
+- **异常处理不一致**：修复了 `@streaming_tool` 缺少 `failure_error_function` 支持的问题
+- **错误跟踪缺失**：添加了 `_error_tracing.attach_error_to_current_span` 调用
+- **日志记录不完整**：补充了参数详细日志和工具完成日志
+- **装饰器返回逻辑**：统一了装饰器的返回逻辑和注释风格
+
+### Technical Details
+- **架构一致性**：确保两种工具装饰器在异常处理、日志记录、错误跟踪等方面完全一致
+- **向后兼容性**：所有更改都保持向后兼容，现有代码无需修改
+- **类型安全**：完整的类型注解支持，包括新的 `failure_error_function` 参数
+
 ## [0.2.3] - 2025-01-19
 
 ### Added

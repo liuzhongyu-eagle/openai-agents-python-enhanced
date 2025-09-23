@@ -529,6 +529,7 @@ def streaming_tool(
     description_override: str | None = None,
     docstring_style: DocstringStyle | None = None,
     use_docstring_info: bool = True,
+    failure_error_function: ToolErrorFunction | None = default_tool_error_function,
     strict_mode: bool = True,
     is_enabled: bool | Callable[[RunContextWrapper[Any], Agent[Any]], MaybeAwaitable[bool]] = True,
     enable_bracketing: bool = True,
@@ -544,6 +545,7 @@ def streaming_tool(
     description_override: str | None = None,
     docstring_style: DocstringStyle | None = None,
     use_docstring_info: bool = True,
+    failure_error_function: ToolErrorFunction | None = default_tool_error_function,
     strict_mode: bool = True,
     is_enabled: bool | Callable[[RunContextWrapper[Any], Agent[Any]], MaybeAwaitable[bool]] = True,
     enable_bracketing: bool = True,
@@ -559,16 +561,49 @@ def streaming_tool(
     description_override: str | None = None,
     docstring_style: DocstringStyle | None = None,
     use_docstring_info: bool = True,
+    failure_error_function: ToolErrorFunction | None = default_tool_error_function,
     strict_mode: bool = True,
     is_enabled: bool | Callable[[RunContextWrapper[Any], Agent[Any]], MaybeAwaitable[bool]] = True,
     enable_bracketing: bool = True,
 ) -> StreamingTool | Callable[[StreamingToolFunction[...]], StreamingTool]:
     """
-    Decorator to create a StreamingTool from an async generator function.
+    Decorator to create a StreamingTool from an async generator function. By default, we will:
+    1. Parse the function signature to create a JSON schema for the tool's parameters.
+    2. Use the function's docstring to populate the tool's description.
+    3. Use the function's docstring to populate argument descriptions.
+    The docstring style is detected automatically, but you can override it.
+
     The decorated function must be an async generator
     (async def a_func(...) -> AsyncIterator[StreamEvent]).
     It should `yield` StreamEvent objects as intermediate events,
     and finally `yield "..."` to return a string as the final output.
+
+    If the function takes a `RunContextWrapper` as the first argument, it *must* match the
+    context type of the agent that uses the tool.
+
+    Args:
+        func: The function to wrap.
+        name_override: If provided, use this name for the tool instead of the function's name.
+        description_override: If provided, use this description for the tool instead of the
+            function's docstring.
+        docstring_style: If provided, use this style for the tool's docstring. If not provided,
+            we will attempt to auto-detect the style.
+        use_docstring_info: If True, use the function's docstring to populate the tool's
+            description and argument descriptions.
+        failure_error_function: If provided, use this function to generate an error message when
+            the tool call fails. The error message is sent to the LLM as the final yield.
+            If you pass None, then exceptions will be re-raised.
+        strict_mode: Whether to enable strict mode for the tool's JSON schema. We *strongly*
+            recommend setting this to True, as it increases the likelihood of correct JSON input.
+            If False, it allows non-strict JSON schemas. For example, if a parameter has a default
+            value, it will be optional, additional properties are allowed, etc. See here for more:
+            https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#supported-schemas
+        is_enabled: Whether the tool is enabled. Can be a bool or a callable that takes the run
+            context and agent and returns whether the tool is enabled. Disabled tools are hidden
+            from the LLM at runtime.
+        enable_bracketing: Whether to emit StreamingToolStartEvent and StreamingToolEndEvent
+            around the tool execution. These events help track the start and end of streaming
+            tool execution.
     """
 
     def _create_streaming_tool(the_func: StreamingToolFunction[...]) -> StreamingTool:
@@ -615,6 +650,10 @@ def streaming_tool(
             else:
                 logger.debug(f"Invoking tool {schema.name} with input {input_str}")
 
+            # 添加与 function_tool 一致的参数日志
+            if not _debug.DONT_LOG_TOOL_DATA:
+                logger.debug(f"Tool call args: {args}, kwargs: {kwargs}")
+
             try:
                 if enable_bracketing:
                     # 合并 args 和 kwargs 为完整的参数字典，用于显示
@@ -649,6 +688,13 @@ def streaming_tool(
                             yield StreamingToolEndEvent(
                                 tool_name=schema.name, tool_call_id=tool_call_id
                             )
+
+                        # 添加与 function_tool 一致的完成日志
+                        if _debug.DONT_LOG_TOOL_DATA:
+                            logger.debug(f"Tool {schema.name} completed.")
+                        else:
+                            logger.debug(f"Tool {schema.name} returned {event}")
+
                         yield event
                         return
 
@@ -661,11 +707,34 @@ def streaming_tool(
                 if enable_bracketing:
                     yield StreamingToolEndEvent(tool_name=schema.name, tool_call_id=tool_call_id)
 
-            except Exception:
+            except Exception as e:
                 # 异常情况下也要确保发送结束事件
                 if enable_bracketing:
                     yield StreamingToolEndEvent(tool_name=schema.name, tool_call_id=tool_call_id)
-                raise
+
+                # 与 function_tool 一致的异常处理
+                if failure_error_function is None:
+                    raise
+
+                # 调用错误处理函数生成错误消息
+                error_message = failure_error_function(ctx, e)
+                if inspect.isawaitable(error_message):
+                    error_message = await error_message
+
+                # 添加错误跟踪，与 function_tool 保持一致
+                _error_tracing.attach_error_to_current_span(
+                    SpanError(
+                        message="Error running tool (non-fatal)",
+                        data={
+                            "tool_name": schema.name,
+                            "error": str(e),
+                        },
+                    )
+                )
+
+                # 将错误消息作为最终结果返回
+                yield str(error_message)
+                return
 
         return StreamingTool(
             name=schema.name,
@@ -676,7 +745,12 @@ def streaming_tool(
             is_enabled=is_enabled,
         )
 
-    if func:
+    # If func is actually a callable, we were used as @streaming_tool with no parentheses
+    if callable(func):
         return _create_streaming_tool(func)
-    else:
-        return _create_streaming_tool
+
+    # Otherwise, we were used as @streaming_tool(...), so return a decorator
+    def decorator(real_func: StreamingToolFunction[...]) -> StreamingTool:
+        return _create_streaming_tool(real_func)
+
+    return decorator
