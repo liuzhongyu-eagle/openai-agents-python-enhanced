@@ -3,21 +3,14 @@
 """
 
 import json
-from typing import Any
 
 import pytest
 
 from agents import Agent, ModelProvider, RunConfig, Runner
-from agents.models.interface import Model, ModelTracing
-from agents.model_settings import ModelSettings
-from agents.tool import Tool
-from agents.handoffs import Handoff
-from agents.items import TResponseInputItem, ModelResponse
-from agents.agent_output import AgentOutputSchemaBase
-from agents.usage import Usage
+from agents.models.interface import Model
 
 from .fake_model import FakeModel
-from .test_responses import get_text_message, get_function_tool_call
+from .test_responses import get_function_tool_call, get_text_message
 
 
 class TrackingModelProvider(ModelProvider):

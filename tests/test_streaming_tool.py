@@ -185,9 +185,7 @@ class TestStreamingToolDecorator:
 
         # 测试错误情况 - 现在应该返回错误消息而不是抛出异常
         events = []
-        async for event in error_tool.on_invoke_tool(
-            ctx, '{"should_fail": true}', "error_test"
-        ):
+        async for event in error_tool.on_invoke_tool(ctx, '{"should_fail": true}', "error_test"):
             events.append(event)
 
         # 应该收到开始事件、通知事件、结束事件和错误消息
@@ -687,7 +685,9 @@ class TestStreamingToolAdvanced:
         """测试 failure_error_function=None 时的错误处理"""
 
         @streaming_tool(failure_error_function=None)
-        async def error_tool_no_handler(should_fail: bool) -> AsyncGenerator[StreamEvent | str, Any]:
+        async def error_tool_no_handler(
+            should_fail: bool,
+        ) -> AsyncGenerator[StreamEvent | str, Any]:
             yield NotifyStreamEvent(data="开始执行")
             if should_fail:
                 raise ValueError("应该抛出的错误")

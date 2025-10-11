@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2025-04-11
+
+### Added
+- **Pydantic 对象保留支持**：当使用 `tool_use_behavior` 强制停止模式时，保留工具返回的 Pydantic 对象
+  - 当 `tool_use_behavior="stop_on_first_tool"` 时，不再强制转换为字符串
+  - 当 `tool_use_behavior={"stop_at_tool_names": [...]}` 时，保留原始对象类型
+  - 当 `tool_use_behavior=custom_function` 时，保留原始对象类型
+  - 支持 100% 可靠的结构化输出（通过 Function Calling）
+
+### Enhanced
+- **类型安全**：现在可以直接访问 `result.final_output.field_name`，无需解析字符串
+- **数据验证**：Pydantic 在工具内部完成验证，无需二次解析
+- **系统集成**：下游系统可以直接使用 Pydantic 对象，无需序列化/反序列化
+- **向后兼容性**：默认行为（`tool_use_behavior="run_llm_again"`）保持不变，仍然转换为字符串
+
+### Technical Details
+- **修改范围**：仅修改 `src/agents/_run_impl.py` 第 366-375 行
+- **逻辑优化**：当 `output_type` 未设置且 `tool_use_behavior != "run_llm_again"` 时，跳过字符串转换
+- **测试覆盖**：添加了 6 个测试用例验证各种场景
+- **代码质量**：通过所有 lint、format 和 mypy 检查
+
+### Use Case Example
+```python
+from pydantic import BaseModel
+from agents import Agent, Runner, function_tool
+
+class UserProfile(BaseModel):
+    name: str
+    age: int
+
+@function_tool
+def extract_profile(text: str) -> UserProfile:
+    return UserProfile(name="Alice", age=30)
+
+agent = Agent(
+    name="Extractor",
+    tools=[extract_profile],
+    tool_use_behavior="stop_on_first_tool"
+)
+
+result = await Runner.run(agent, "extract")
+# result.final_output 现在是 UserProfile 对象，而不是字符串！
+assert isinstance(result.final_output, UserProfile)
+assert result.final_output.name == "Alice"
+```
+
 ## [0.2.4] - 2025-01-23
 
 ### Added

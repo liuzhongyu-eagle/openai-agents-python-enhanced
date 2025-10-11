@@ -365,7 +365,12 @@ class RunImpl:
 
         if check_tool_use.is_final_output:
             # If the output type is str, then let's just stringify it
-            if not agent.output_type or agent.output_type is str:
+            # When using tool_use_behavior to stop at tools, preserve the original type
+            # unless explicitly requested str output
+            should_stringify = agent.output_type is str or (
+                not agent.output_type and agent.tool_use_behavior == "run_llm_again"
+            )
+            if should_stringify:
                 check_tool_use.final_output = str(check_tool_use.final_output)
 
             if check_tool_use.final_output is None:
