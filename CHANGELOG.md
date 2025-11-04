@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2025-11-04
+
+### Added
+- **JSON Schema $ref 完全展开支持**：自动展开所有 `$ref` 引用，确保与不支持 JSON Schema `$ref` 的 LLM 模型兼容
+  - 新增 `inline_all_refs()` 函数，递归展开所有 `$ref` 引用
+  - 修改 `ensure_strict_json_schema()` 函数，在返回前自动调用 `inline_all_refs()`
+  - 展开后移除 `$defs` 和 `definitions` 字段（已无引用）
+  - 支持循环引用检测，避免无限递归
+
+### Fixed
+- **Gemini 2.5 Pro 兼容性**：修复 Gemini 2.5 Pro 无法解析 `$ref` 导致的参数错误问题
+  - 之前：Gemini 将嵌套 Pydantic 对象当作字符串处理
+  - 现在：生成内联 schema，Gemini 可以正确理解嵌套对象结构
+- **Qwen3-max 兼容性**：修复 Qwen3-max 在 `additionalProperties: false` + `$ref` 组合下的序列化问题
+  - 之前：Qwen3-max 将嵌套对象序列化为 JSON 字符串
+  - 现在：使用内联定义，Qwen3-max 可以正确生成嵌套对象
+
+### Technical Details
+- **修改文件**：`src/agents/strict_schema.py`
+- **新增函数**：`inline_all_refs(schema, root, visited)` - 110 行
+- **修改函数**：`ensure_strict_json_schema()` - 添加 $ref 展开逻辑
+- **测试覆盖**：新增 `tests/test_inline_refs.py`，包含 11 个测试用例
+  - 简单 $ref 展开
+  - 嵌套 $ref 展开
+  - $ref + 额外属性（description）
+  - anyOf/allOf 中的 $ref
+  - 数组 items 中的 $ref
+  - 循环引用检测
+  - 多处引用同一定义
+
+### Impact
+- **向后兼容性**：✅ 完全兼容，不影响现有功能
+- **性能影响**：✅ 最小化，仅在生成 schema 时执行一次
+- **模型兼容性**：✅ 提升，支持更多 LLM 模型（Gemini、Qwen3-max 等）
+
+### Use Case Example
+```python
+from pydantic import BaseModel
+from agents import function_tool
+
+class UserProfile(BaseModel):
+    """用户画像"""
+    name: str
+    age: int
+    city: str
+
+@function_tool
+def extract_profile(profile: UserProfile) -> UserProfile:
+    """提取用户画像信息"""
+    return profile
+
+# 之前（使用 $ref）：
+# Gemini 2.5 Pro 返回：{"profile": "我叫张三，28岁，住在北京"}  ❌
+# Qwen3-max 返回：{"profile": "{\"name\": \"张三\", \"age\": 28, \"city\": \"北京\"}"}  ❌
+
+# 现在（内联展开）：
+# Gemini 2.5 Pro 返回：{"profile": {"name": "张三", "age": 28, "city": "北京"}}  ✅
+# Qwen3-max 返回：{"profile": {"name": "张三", "age": 28, "city": "北京"}}  ✅
+```
+
 ## [0.2.5] - 2025-04-11
 
 ### Added

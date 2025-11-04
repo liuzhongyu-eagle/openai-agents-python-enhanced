@@ -353,18 +353,18 @@ def test_enum_and_literal_function():
     assert isinstance(func_schema.params_json_schema, dict)
     assert func_schema.params_json_schema.get("title") == "enum_and_literal_function_args"
 
-    # Check that the enum values are included in the JSON schema
-    assert func_schema.params_json_schema.get("$defs", {}).get("MyEnum", {}).get("enum") == [
+    # Check that the enum values are included in the JSON schema (inlined, not in $defs)
+    assert func_schema.params_json_schema.get("properties", {}).get("a", {}).get("enum") == [
         "foo",
         "bar",
         "baz",
     ]
 
-    # Check that the enum is expressed as a def
-    assert (
-        func_schema.params_json_schema.get("properties", {}).get("a", {}).get("$ref")
-        == "#/$defs/MyEnum"
-    )
+    # Check that $defs has been removed (all refs are inlined)
+    assert "$defs" not in func_schema.params_json_schema
+
+    # Check that the enum is inlined (no $ref)
+    assert "$ref" not in func_schema.params_json_schema.get("properties", {}).get("a", {})
 
     # Check that the literal values are included in the JSON schema
     assert func_schema.params_json_schema.get("properties", {}).get("b", {}).get("enum") == [

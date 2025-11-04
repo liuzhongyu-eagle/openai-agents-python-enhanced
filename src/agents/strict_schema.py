@@ -20,10 +20,24 @@ def ensure_strict_json_schema(
 ) -> dict[str, Any]:
     """Mutates the given JSON schema to ensure it conforms to the `strict` standard
     that the OpenAI API expects.
+
+    Additionally, this function inlines all $ref references to ensure compatibility
+    with LLM models that don't support JSON Schema $ref (e.g., Gemini 2.5 Pro).
     """
     if schema == {}:
         return _EMPTY_SCHEMA
-    return _ensure_strict_json_schema(schema, path=(), root=schema)
+
+    # 第一步：应用 strict 模式的所有规则
+    strict_schema = _ensure_strict_json_schema(schema, path=(), root=schema)
+
+    # 第二步：完全展开所有 $ref 引用
+    inlined_schema = inline_all_refs(strict_schema)
+
+    # 第三步：移除 $defs 和 definitions（已经没有引用了）
+    inlined_schema.pop("$defs", None)
+    inlined_schema.pop("definitions", None)
+
+    return inlined_schema
 
 
 # Adapted from https://github.com/openai/openai-python/blob/main/src/openai/lib/_pydantic.py
@@ -165,3 +179,120 @@ def has_more_than_n_keys(obj: dict[str, object], n: int) -> bool:
         if i > n:
             return True
     return False
+
+
+def inline_all_refs(
+    schema: dict[str, Any],
+    *,
+    root: dict[str, Any] | None = None,
+    visited: set[str] | None = None,
+) -> dict[str, Any]:
+    """完全展开 JSON Schema 中的所有 $ref 引用。
+
+    这个函数递归遍历 JSON Schema，将所有 $ref 引用替换为实际定义的内联版本。
+    这样可以确保与不支持 JSON Schema $ref 的 LLM 模型（如 Gemini 2.5 Pro）兼容。
+
+    Args:
+        schema: 要处理的 JSON Schema
+        root: 根 schema（用于解析 $ref），如果为 None 则使用 schema 本身
+        visited: 已访问的 $ref 集合（用于检测循环引用）
+
+    Returns:
+        展开后的 JSON Schema（不包含任何 $ref）
+
+    Raises:
+        ValueError: 当检测到循环引用时
+    """
+    if root is None:
+        root = schema
+    if visited is None:
+        visited = set()
+
+    # 如果不是字典，直接返回
+    if not is_dict(schema):
+        return {}
+
+    # 1. 如果当前节点有 $ref，解析并替换
+    ref = schema.get("$ref")
+    if ref:
+        assert isinstance(ref, str), f"Received non-string $ref - {ref}"
+
+        # 检测循环引用
+        if ref in visited:
+            raise ValueError(f"Circular reference detected: {ref}")
+
+        # 解析 $ref
+        resolved = resolve_ref(root=root, ref=ref)
+        if not is_dict(resolved):
+            raise ValueError(
+                f"Expected `$ref: {ref}` to resolve to a dictionary but got {resolved}"
+            )
+
+        # 标记为已访问
+        new_visited = visited | {ref}
+
+        # 递归展开解析后的定义
+        inlined = inline_all_refs(resolved, root=root, visited=new_visited)
+
+        # 合并其他属性（如 description），$ref 之外的属性优先
+        result = {**inlined, **{k: v for k, v in schema.items() if k != "$ref"}}
+
+        return result
+
+    # 2. 递归处理嵌套结构
+    result = dict(schema)
+
+    # 处理 properties
+    properties = result.get("properties")
+    if is_dict(properties):
+        result["properties"] = {
+            key: inline_all_refs(prop if is_dict(prop) else {}, root=root, visited=visited)
+            for key, prop in properties.items()
+        }
+
+    # 处理 items（数组）
+    items = result.get("items")
+    if is_dict(items):
+        result["items"] = inline_all_refs(items, root=root, visited=visited)
+
+    # 处理 anyOf
+    any_of = result.get("anyOf")
+    if is_list(any_of):
+        result["anyOf"] = [
+            inline_all_refs(variant if is_dict(variant) else {}, root=root, visited=visited)
+            for variant in any_of
+        ]
+
+    # 处理 allOf
+    all_of = result.get("allOf")
+    if is_list(all_of):
+        result["allOf"] = [
+            inline_all_refs(entry if is_dict(entry) else {}, root=root, visited=visited)
+            for entry in all_of
+        ]
+
+    # 处理 $defs（递归展开其中的定义，但不移除，因为可能还有其他地方引用）
+    defs = result.get("$defs")
+    if is_dict(defs):
+        result["$defs"] = {
+            key: inline_all_refs(
+                def_schema if is_dict(def_schema) else {},
+                root=root,
+                visited=visited,
+            )
+            for key, def_schema in defs.items()
+        }
+
+    # 处理 definitions（同 $defs）
+    definitions = result.get("definitions")
+    if is_dict(definitions):
+        result["definitions"] = {
+            key: inline_all_refs(
+                def_schema if is_dict(def_schema) else {},
+                root=root,
+                visited=visited,
+            )
+            for key, def_schema in definitions.items()
+        }
+
+    return result
