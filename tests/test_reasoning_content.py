@@ -41,6 +41,25 @@ def create_reasoning_delta(content: str) -> dict[str, Any]:
     }
 
 
+def create_openrouter_reasoning_delta(content: str) -> dict[str, Any]:
+    """Create a delta dictionary with OpenRouter reasoning format (delta.reasoning)"""
+    return {
+        "content": None,
+        "role": None,
+        "function_call": None,
+        "tool_calls": None,
+        "reasoning": content,
+        "reasoning_details": [
+            {
+                "type": "reasoning.text",
+                "text": content,
+                "format": "unknown",
+                "index": 0,
+            }
+        ],
+    }
+
+
 def create_chunk(delta: dict[str, Any], include_usage: bool = False) -> ChatCompletionChunk:
     """Create a ChatCompletionChunk with the given delta"""
     # Create a ChoiceDelta object from the dictionary
@@ -56,6 +75,14 @@ def create_chunk(delta: dict[str, Any], include_usage: bool = False) -> ChatComp
         # Use direct assignment for the reasoning_content attribute
         delta_obj_any = cast(Any, delta_obj)
         delta_obj_any.reasoning_content = delta["reasoning_content"]
+
+    # Add OpenRouter reasoning attributes dynamically if present
+    if "reasoning" in delta:
+        delta_obj_any = cast(Any, delta_obj)
+        delta_obj_any.reasoning = delta["reasoning"]
+    if "reasoning_details" in delta:
+        delta_obj_any = cast(Any, delta_obj)
+        delta_obj_any.reasoning_details = delta["reasoning_details"]
 
     # Create the chunk
     chunk = ChatCompletionChunk(
@@ -283,3 +310,148 @@ async def test_stream_response_with_empty_reasoning_content(monkeypatch) -> None
     assert isinstance(response_event.response.output[0], ResponseOutputMessage)
     assert isinstance(response_event.response.output[0].content[0], ResponseOutputText)
     assert response_event.response.output[0].content[0].text == "The answer is 42"
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_stream_response_with_openrouter_reasoning_format(monkeypatch) -> None:
+    """
+    Test that OpenRouter reasoning format (delta.reasoning) is correctly handled.
+    This validates compatibility with OpenRouter API which returns delta.reasoning
+    instead of delta.reasoning_content.
+    """
+    # Create test chunks using OpenRouter format
+    chunks = [
+        # OpenRouter reasoning content chunks
+        create_chunk(create_openrouter_reasoning_delta("Let me think")),
+        create_chunk(create_openrouter_reasoning_delta(" about this")),
+        # Regular content chunks
+        create_chunk(create_content_delta("The answer")),
+        create_chunk(create_content_delta(" is 42"), include_usage=True),
+    ]
+
+    async def patched_fetch_response(self, *args, **kwargs):
+        resp = Response(
+            id="resp-id",
+            created_at=0,
+            model="fake-model",
+            object="response",
+            output=[],
+            tool_choice="none",
+            tools=[],
+            parallel_tool_calls=False,
+        )
+        return resp, create_fake_stream(chunks)
+
+    monkeypatch.setattr(OpenAIChatCompletionsModel, "_fetch_response", patched_fetch_response)
+    model = OpenAIProvider(use_responses=False).get_model("gpt-4")
+    output_events = []
+    async for event in model.stream_response(
+        system_instructions=None,
+        input="",
+        model_settings=ModelSettings(),
+        tools=[],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        prompt=None,
+    ):
+        output_events.append(event)
+
+    # verify reasoning content events were emitted
+    reasoning_delta_events = [
+        e for e in output_events if e.type == "response.reasoning_summary_text.delta"
+    ]
+    assert len(reasoning_delta_events) == 2
+    assert reasoning_delta_events[0].delta == "Let me think"
+    assert reasoning_delta_events[1].delta == " about this"
+
+    # verify regular content events were emitted
+    content_delta_events = [e for e in output_events if e.type == "response.output_text.delta"]
+    assert len(content_delta_events) == 2
+    assert content_delta_events[0].delta == "The answer"
+    assert content_delta_events[1].delta == " is 42"
+
+    # verify the final response contains both types of content
+    response_event = output_events[-1]
+    assert response_event.type == "response.completed"
+    assert len(response_event.response.output) == 2
+
+    # first item should be reasoning
+    assert isinstance(response_event.response.output[0], ResponseReasoningItem)
+    assert response_event.response.output[0].summary[0].text == "Let me think about this"
+
+    # second item should be message with text
+    assert isinstance(response_event.response.output[1], ResponseOutputMessage)
+    assert isinstance(response_event.response.output[1].content[0], ResponseOutputText)
+    assert response_event.response.output[1].content[0].text == "The answer is 42"
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_get_response_with_openrouter_reasoning_format(monkeypatch) -> None:
+    """
+    Test that OpenRouter reasoning format (message.reasoning) is correctly handled
+    in non-streaming mode.
+    """
+    # create a message with OpenRouter reasoning format
+    msg = ChatCompletionMessage(
+        role="assistant",
+        content="The answer is 42",
+    )
+    # Use dynamic attribute for reasoning (OpenRouter format)
+    msg_with_reasoning = cast(Any, msg)
+    msg_with_reasoning.reasoning = "Let me think about this question carefully"
+
+    # create a choice with the message
+    mock_choice = {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": msg_with_reasoning,
+        "delta": None,
+    }
+
+    chat = ChatCompletion(
+        id="resp-id",
+        created=0,
+        model="deepseek is expected",
+        object="chat.completion",
+        choices=[mock_choice],  # type: ignore[list-item]
+        usage=CompletionUsage(
+            completion_tokens=10,
+            prompt_tokens=5,
+            total_tokens=15,
+            completion_tokens_details=CompletionTokensDetails(reasoning_tokens=6),
+            prompt_tokens_details=PromptTokensDetails(cached_tokens=0),
+        ),
+    )
+
+    async def patched_fetch_response(self, *args, **kwargs):
+        return chat
+
+    monkeypatch.setattr(OpenAIChatCompletionsModel, "_fetch_response", patched_fetch_response)
+    model = OpenAIProvider(use_responses=False).get_model("gpt-4")
+    resp = await model.get_response(
+        system_instructions=None,
+        input="",
+        model_settings=ModelSettings(),
+        tools=[],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        prompt=None,
+    )
+
+    # should have produced a reasoning item and a message with text content
+    assert len(resp.output) == 2
+
+    # first output should be the reasoning item
+    assert isinstance(resp.output[0], ResponseReasoningItem)
+    assert resp.output[0].summary[0].text == "Let me think about this question carefully"
+
+    # second output should be the message with text content
+    assert isinstance(resp.output[1], ResponseOutputMessage)
+    assert isinstance(resp.output[1].content[0], ResponseOutputText)
+    assert resp.output[1].content[0].text == "The answer is 42"

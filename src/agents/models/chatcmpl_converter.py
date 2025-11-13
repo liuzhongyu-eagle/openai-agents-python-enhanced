@@ -96,11 +96,20 @@ class Converter:
         items: list[TResponseOutputItem] = []
 
         # Handle reasoning content if available
+        # Support two formats:
+        # 1. OpenAI Responses API: message.reasoning_content (string)
+        # 2. OpenRouter/Standard Chat Completions API: message.reasoning (string)
+        reasoning_content = None
         if hasattr(message, "reasoning_content") and message.reasoning_content:
+            reasoning_content = message.reasoning_content
+        elif hasattr(message, "reasoning") and message.reasoning:
+            reasoning_content = message.reasoning
+
+        if reasoning_content:
             items.append(
                 ResponseReasoningItem(
                     id=FAKE_RESPONSES_ID,
-                    summary=[Summary(text=message.reasoning_content, type="summary_text")],
+                    summary=[Summary(text=reasoning_content, type="summary_text")],
                     type="reasoning",
                 )
             )

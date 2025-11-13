@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] - 2025-11-13
+
+### Added
+- **OpenRouter 推理格式支持**：ChatCmplStreamHandler 现在可以识别和处理 OpenRouter API 返回的推理内容
+  - 支持 `delta.reasoning` 字段（OpenRouter/标准 Chat Completions API 格式）
+  - 保持对 `delta.reasoning_content` 字段的支持（OpenAI Responses API 格式）
+  - 优先级检查：优先检查 `reasoning_content`，然后检查 `reasoning`
+  - 流式处理：`chatcmpl_stream_handler.py` 支持流式推理事件
+  - 非流式处理：`chatcmpl_converter.py` 支持非流式推理内容转换
+
+### Fixed
+- **OpenRouter 推理事件捕获**：修复使用 OpenRouter 作为模型提供商时，推理事件无法被捕获的问题
+  - 之前：agents-sdk 只检查 `delta.reasoning_content`，无法识别 OpenRouter 的 `delta.reasoning`
+  - 现在：同时支持两种格式，启用 OpenRouter 模型的推理功能（DeepSeek、Claude 等）
+
+### Technical Details
+- **修改文件**：
+  - `src/agents/models/chatcmpl_stream_handler.py` - 添加 `delta.reasoning` 字段检查
+  - `src/agents/models/chatcmpl_converter.py` - 添加 `message.reasoning` 字段检查
+- **测试覆盖**：扩展 `tests/test_reasoning_content.py`，新增 2 个测试用例
+  - `test_stream_response_with_openrouter_reasoning_format()` - 测试流式 OpenRouter 格式
+  - `test_get_response_with_openrouter_reasoning_format()` - 测试非流式 OpenRouter 格式
+  - 新增辅助函数 `create_openrouter_reasoning_delta()` 模拟 OpenRouter API 响应
+
+### Impact
+- **向后兼容性**：✅ 完全兼容，不影响现有代码
+- **性能影响**：✅ 最小化，仅增加一次字段检查
+- **模型兼容性**：✅ 提升，支持 OpenRouter、DeepSeek、Claude 等模型的推理功能
+- **测试通过率**：✅ 所有推理相关测试通过（5/5）
+
 ## [0.2.6] - 2025-11-04
 
 ### Added

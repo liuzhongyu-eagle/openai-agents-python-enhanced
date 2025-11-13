@@ -93,9 +93,18 @@ class ChatCmplStreamHandler:
             delta = chunk.choices[0].delta
 
             # Handle reasoning content
+            # Support two formats:
+            # 1. OpenAI Responses API: delta.reasoning_content (string)
+            # 2. OpenRouter/Standard Chat Completions API:
+            #    delta.reasoning (string) + delta.reasoning_details (array)
+            reasoning_content = None
             if hasattr(delta, "reasoning_content"):
                 reasoning_content = delta.reasoning_content
-                if reasoning_content and not state.reasoning_content_index_and_output:
+            elif hasattr(delta, "reasoning") and delta.reasoning:
+                reasoning_content = delta.reasoning
+
+            if reasoning_content:
+                if not state.reasoning_content_index_and_output:
                     state.reasoning_content_index_and_output = (
                         0,
                         ResponseReasoningItem(
@@ -124,7 +133,7 @@ class ChatCmplStreamHandler:
                         sequence_number=sequence_number.get_and_increment(),
                     )
 
-                if reasoning_content and state.reasoning_content_index_and_output:
+                if state.reasoning_content_index_and_output:
                     yield ResponseReasoningSummaryTextDeltaEvent(
                         delta=reasoning_content,
                         item_id=FAKE_RESPONSES_ID,
