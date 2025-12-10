@@ -43,6 +43,7 @@ from ..exceptions import AgentsException, UserError
 from ..handoffs import Handoff
 from ..items import TResponseInputItem, TResponseOutputItem
 from ..tool import FunctionTool, StreamingTool, Tool
+from .chatcmpl_helpers import extract_reasoning_content
 from .fake_id import FAKE_RESPONSES_ID
 
 
@@ -96,14 +97,14 @@ class Converter:
         items: list[TResponseOutputItem] = []
 
         # Handle reasoning content if available
-        # Support two formats:
+        # Support three formats (via extract_reasoning_content helper):
         # 1. OpenAI Responses API: message.reasoning_content (string)
-        # 2. OpenRouter/Standard Chat Completions API: message.reasoning (string)
-        reasoning_content = None
-        if hasattr(message, "reasoning_content") and message.reasoning_content:
-            reasoning_content = message.reasoning_content
-        elif hasattr(message, "reasoning") and message.reasoning:
-            reasoning_content = message.reasoning
+        # 2. OpenRouter simplified: message.reasoning (string)
+        # 3. OpenRouter detailed: message.reasoning_details (array of objects)
+        #    - reasoning.text: plain text reasoning (Claude/Gemini/DeepSeek)
+        #    - reasoning.summary: reasoning summary (OpenAI GPT-5)
+        #    - reasoning.encrypted: ignored (encrypted content)
+        reasoning_content = extract_reasoning_content(message)
 
         if reasoning_content:
             items.append(

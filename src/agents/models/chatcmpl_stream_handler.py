@@ -36,6 +36,7 @@ from openai.types.responses.response_reasoning_summary_part_done_event import Pa
 from openai.types.responses.response_usage import InputTokensDetails, OutputTokensDetails
 
 from ..items import TResponseStreamEvent
+from .chatcmpl_helpers import extract_reasoning_content
 from .fake_id import FAKE_RESPONSES_ID
 
 
@@ -93,15 +94,14 @@ class ChatCmplStreamHandler:
             delta = chunk.choices[0].delta
 
             # Handle reasoning content
-            # Support two formats:
+            # Support three formats (via extract_reasoning_content helper):
             # 1. OpenAI Responses API: delta.reasoning_content (string)
-            # 2. OpenRouter/Standard Chat Completions API:
-            #    delta.reasoning (string) + delta.reasoning_details (array)
-            reasoning_content = None
-            if hasattr(delta, "reasoning_content"):
-                reasoning_content = delta.reasoning_content
-            elif hasattr(delta, "reasoning") and delta.reasoning:
-                reasoning_content = delta.reasoning
+            # 2. OpenRouter simplified: delta.reasoning (string)
+            # 3. OpenRouter detailed: delta.reasoning_details (array of objects)
+            #    - reasoning.text: plain text reasoning (Claude/Gemini/DeepSeek)
+            #    - reasoning.summary: reasoning summary (OpenAI GPT-5)
+            #    - reasoning.encrypted: ignored (encrypted content)
+            reasoning_content = extract_reasoning_content(delta)
 
             if reasoning_content:
                 if not state.reasoning_content_index_and_output:
